@@ -80,6 +80,129 @@ function send(msg) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
+// ── Audio ──────────────────────────────────────────────────────────────────
+// All music is synthesised via the Web Audio API — no files, no CDN.
+
+let _actx = null, _mGain = null, _muted = false, _loopTimer = null, _anodes = [];
+
+// Note frequencies (Hz)
+const N = {
+  G3:196.0, A3:220.0, B3:246.9,
+  C4:261.6, D4:293.7, E4:329.6, F4:349.2, G4:392.0, A4:440.0, B4:493.9,
+  C5:523.3, D5:587.3, E5:659.3, F5:698.5, G5:784.0, A5:880.0, B5:987.8, C6:1046.5,
+};
+
+function _getCtx() {
+  if (!_actx) {
+    try {
+      _actx = new (window.AudioContext || window.webkitAudioContext)();
+      _mGain = _actx.createGain();
+      _mGain.gain.value = 0.22;
+      _mGain.connect(_actx.destination);
+    } catch(e) { return null; }
+  }
+  if (_actx.state === 'suspended') _actx.resume();
+  return _actx;
+}
+
+function stopMusic() {
+  clearTimeout(_loopTimer); _loopTimer = null;
+  _anodes.forEach(n => { try { n.stop(0); } catch(e) {} });
+  _anodes = [];
+}
+
+function toggleMute() {
+  _muted = !_muted;
+  if (_mGain) _mGain.gain.setTargetAtTime(_muted ? 0 : 0.22, _actx.currentTime, 0.05);
+  return _muted;
+}
+
+// Schedule an array of [freq, beats] (freq=0 → rest). Returns end time.
+function _sched(seq, bpm, wave, vol, t0) {
+  const ctx = _getCtx(); if (!ctx) return t0;
+  const beat = 60 / bpm;
+  let t = t0;
+  seq.forEach(([f, b]) => {
+    const dur = b * beat;
+    if (f) {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      const att = Math.min(0.02, dur * 0.12);
+      const rel = Math.min(0.12, dur * 0.4);
+      osc.type = wave;
+      osc.frequency.value = f;
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(vol, t + att);
+      env.gain.setValueAtTime(vol, t + dur - rel);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.005);
+      osc.connect(env); env.connect(_mGain);
+      osc.start(t); osc.stop(t + dur);
+      _anodes.push(osc);
+    }
+    t += dur;
+  });
+  return t;
+}
+
+function _loop(seq, bpm, wave, vol) {
+  stopMusic();
+  const ctx = _getCtx(); if (!ctx) return;
+  const totalSecs = seq.reduce((s, [, b]) => s + b, 0) * (60 / bpm);
+  function go(start) {
+    _anodes = []; // prune expired refs each iteration
+    const end = _sched(seq, bpm, wave, vol, start);
+    _loopTimer = setTimeout(() => go(end), (totalSecs - 0.3) * 1000);
+  }
+  go(ctx.currentTime + 0.05);
+}
+
+function _once(seq, bpm, wave, vol) {
+  const ctx = _getCtx(); if (!ctx) return;
+  _sched(seq, bpm, wave, vol, ctx.currentTime + 0.05);
+}
+
+// Lobby: upbeat C-major melody (triangle, 130 BPM)
+function startLobbyMusic() {
+  _loop([
+    [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.E5,.5],
+    [N.C5,.5],[N.D5,.5],[N.E5,1],
+    [N.G5,.5],[N.E5,.5],[N.D5,.5],[N.C5,.5],
+    [N.G4,2],
+  ], 130, 'triangle', 0.15);
+}
+
+// Question: tense A-minor rhythmic pulse (square, 140 BPM)
+function startQuestionMusic() {
+  _loop([
+    [N.A4,.5],[0,.5],[N.A4,.5],[0,.5],
+    [N.G4,.5],[0,.5],[N.A4,.5],[0,.5],
+    [N.A4,.5],[N.C5,.25],[N.B4,.25],[N.A4,1],
+    [N.G4,2],
+  ], 140, 'square', 0.09);
+}
+
+// Reveal: ascending C-major fanfare (plays once)
+function playRevealStinger() {
+  _once([
+    [N.C5,.2],[N.E5,.2],[N.G5,.2],[N.C6,.45],
+  ], 160, 'triangle', 0.18);
+}
+
+// Floating mute button — appended after each screen render
+function _appendMuteBtn() {
+  const btn = document.createElement('button');
+  btn.title = 'Toggle music';
+  btn.textContent = _muted ? '🔇' : '🔊';
+  btn.style.cssText = 'position:fixed;bottom:16px;right:16px;background:rgba(255,255,255,0.13);' +
+    'border:none;border-radius:50%;width:38px;height:38px;font-size:17px;' +
+    'cursor:pointer;z-index:999;display:flex;align-items:center;justify-content:center;' +
+    'transition:background 0.15s;';
+  btn.addEventListener('mouseenter', () => { btn.style.background = 'rgba(255,255,255,0.25)'; });
+  btn.addEventListener('mouseleave', () => { btn.style.background = 'rgba(255,255,255,0.13)'; });
+  btn.addEventListener('click', () => { btn.textContent = toggleMute() ? '🔇' : '🔊'; });
+  app.appendChild(btn);
+}
+
 // ── Message handlers ───────────────────────────────────────────────────────
 function onMessage(msg) {
   switch (msg.type) {
@@ -135,6 +258,10 @@ function onMessage(msg) {
 function setPhase(phase) {
   S.phase = phase;
   renderScreen();
+  // Music hooks (question music is started by doStartTimerOnce, not here)
+  if      (phase === 'lobby')   startLobbyMusic();
+  else if (phase === 'reveal')  { stopMusic(); playRevealStinger(); }
+  else if (phase !== 'question') stopMusic();
 }
 
 // ── Timer ──────────────────────────────────────────────────────────────────
@@ -290,6 +417,7 @@ function renderScreen() {
     case 'leaderboard':  app.innerHTML = htmlLeaderboard();  bindLeaderboard(); break;
     case 'final':        app.innerHTML = htmlFinal();        bindFinal();       break;
   }
+  if (S.phase !== 'setup') _appendMuteBtn();
 }
 
 // ── 1. Setup ───────────────────────────────────────────────────────────────
@@ -675,6 +803,7 @@ function bindPreQuestion() {
     if (timerStarted) return;
     timerStarted = true;
     document.removeEventListener('keydown', onKey);
+    startQuestionMusic();
     doStartTimer();
   }
 
