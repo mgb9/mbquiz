@@ -101,7 +101,9 @@ function _getCtx() {
       _mGain.connect(_actx.destination);
     } catch(e) { return null; }
   }
-  if (_actx.state === 'suspended') _actx.resume();
+  // resume() is async but notes scheduled slightly in the future (≥50 ms)
+  // will still play correctly once the context unblocks.
+  if (_actx.state === 'suspended') _actx.resume().catch(() => {});
   return _actx;
 }
 
@@ -1021,11 +1023,11 @@ function bindLeaderboard() {
 // ── 7. Final / Podium ──────────────────────────────────────────────────────
 function htmlFinal() {
   const podium = S.leaderboard.slice(0, 3);
-  // Podium order: 2nd, 1st, 3rd
-  const orderedPodium = [podium[1], podium[0], podium[2]].filter(Boolean);
+  // Visual order: left=2nd, centre=1st, right=3rd
+  // Use podium array indices, not column position, to determine rank.
+  const slots        = [1, 0, 2]; // podium[] index for each visual column
   const podiumHeights = ['62%', '88%', '48%'];
   const podiumColors  = [C.blue, C.orange, C.lime];
-  const podiumRanks   = [2, 1, 3];
 
   return `
 <div style="height:100vh;background:${C.dark};color:#fff;font-family:Lato,sans-serif;padding:52px 56px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:hidden">
@@ -1048,9 +1050,10 @@ function htmlFinal() {
 
   <!-- Podium -->
   <div style="flex:1;display:grid;grid-template-columns:1fr 1.1fr 1fr;align-items:end;gap:20px;padding:0 80px;min-height:0">
-    ${orderedPodium.map((p, col) => {
+    ${slots.map((pidx, col) => {
+      const p = podium[pidx];
       if (!p) return '<div></div>';
-      const rank  = podiumRanks[col];
+      const rank  = p.rank;   // from leaderboard data, not from column position
       const color = podiumColors[col];
       const h     = podiumHeights[col];
       const ord   = rank === 1 ? 'st' : rank === 2 ? 'nd' : 'rd';
