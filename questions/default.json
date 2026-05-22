@@ -1,6 +1,5 @@
 {
   "title": "WMG AQA Essentials — Assessment, Rubrics, MA1 & CA1",
-  "defaultTime": 30,
   "questions": [
     {
       "q": "When are assessments due to be submitted to AQ for the 26/27 assessment approval cycle?",
@@ -10,8 +9,7 @@
         "Monday 1st June 2026",
         "Friday 19th September 2025"
       ],
-      "correct": 0,
-      "time": 30
+      "correct": 0
     },
     {
       "q": "What must assessment rubrics contain to support faster and easier feedback?",
@@ -21,8 +19,7 @@
         "Marks allocated separately for presentation, spelling, punctuation and grammar",
         "The staff-facing marking guidance copied into each row"
       ],
-      "correct": 1,
-      "time": 35
+      "correct": 1
     },
     {
       "q": "True or false: an assessment can stay the same from one academic year to the next.",
@@ -32,8 +29,7 @@
         "False — assessments must be substantially different to last year and changed every academic year",
         "False — but only the resit assessment needs to change"
       ],
-      "correct": 2,
-      "time": 35
+      "correct": 2
     },
     {
       "q": "By what date must New Course Approvals or updates to courses (CA1/MA1 paperwork) for 28/29 launch be submitted?",
@@ -43,8 +39,7 @@
         "Friday 18th September 2026",
         "Friday 26th June 2026"
       ],
-      "correct": 2,
-      "time": 35
+      "correct": 2
     },
     {
       "q": "The MA1 updates being submitted in the next academic year are for which launch year?",
@@ -54,8 +49,7 @@
         "28/29",
         "29/30"
       ],
-      "correct": 2,
-      "time": 30
+      "correct": 2
     },
     {
       "q": "How many times can an assessment normally be used within the same academic year before it must be replaced?",
@@ -65,8 +59,7 @@
         "A maximum of three times",
         "Unlimited, provided the rubric is updated"
       ],
-      "correct": 2,
-      "time": 30
+      "correct": 2
     },
     {
       "q": "Which document is student-facing and must be provided alongside the assessment brief?",
@@ -76,8 +69,7 @@
         "The model answers",
         "The Internal Reviewer's checklist"
       ],
-      "correct": 1,
-      "time": 30
+      "correct": 1
     },
     {
       "q": "Within how many University working days must marks and feedback normally be returned to students?",
@@ -87,8 +79,7 @@
         "20 working days",
         "25 working days"
       ],
-      "correct": 2,
-      "time": 30
+      "correct": 2
     }
   ]
 }

@@ -635,7 +635,7 @@ function bindSetup() {
     S.room        = room;
     S.questions   = parsedData.questions;
     S.quizTitle   = parsedData.title || 'WMG Quiz';
-    S.defaultTime = parsedData.defaultTime || defaultSecs;
+    S.defaultTime = defaultSecs; // UI selection always wins over JSON's defaultTime
     S.flatScoring = flatScoring;
     S.qTotal      = parsedData.questions.length;
 
