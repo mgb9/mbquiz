@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+party/node_modules/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Design / source files not needed on GitHub Pages
+WMG Quiz - Design.html
+wmg-quiz-build-plan.md
+wmg-brand-guidelines-2025-2.1.pdf
+browser-window.jsx
+bundle.jsx
+design-canvas.jsx
+host-screens.jsx
+ios-frame.jsx
+player-screens.jsx
+tweaks-panel.jsx
+wmg.jsx
+
+# Misc
+*.log
+.env

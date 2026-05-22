@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#211F25"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>WMG Quiz · Join</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --wmg-red:          #EE3124;
+    --wmg-blue:         #009DDC;
+    --wmg-gold:         #FBB034;
+    --wmg-lime:         #C1D82F;
+    --wmg-burnt-orange: #F47920;
+    --wmg-dark-grey:    #211F25;
+    --wmg-grey:         #6D6E71;
+    --wmg-bg-chalk:     #FAFAF8;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    height: 100%;
+    /* Prevent iOS elastic scroll from revealing background */
+    overscroll-behavior: none;
+  }
+
+  body {
+    height: 100%;
+    font-family: Lato, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--wmg-dark-grey);
+    overscroll-behavior: none;
+  }
+
+  #app {
+    /* Use dynamic viewport height so the content doesn't hide behind the
+       address bar on mobile Safari */
+    height: 100dvh;
+    /* Safe-area padding for notched phones */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    overflow: hidden;
+  }
+
+  /* Ensure buttons, inputs inherit the font */
+  button, input, select, textarea {
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Tabular numbers everywhere numeric data appears */
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* Prevent text selection on interactive elements */
+  button { user-select: none; -webkit-user-select: none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="src/player.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>WMG Quiz · Host</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;800;900&display=swap" rel="stylesheet">
+
+<!-- QR code library (UMD) -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+<style>
+  :root {
+    --wmg-red:          #EE3124;
+    --wmg-blue:         #009DDC;
+    --wmg-gold:         #FBB034;
+    --wmg-lime:         #C1D82F;
+    --wmg-burnt-orange: #F47920;
+    --wmg-dark-grey:    #211F25;
+    --wmg-grey:         #6D6E71;
+    --wmg-bg-chalk:     #FAFAF8;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    font-family: Lato, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--wmg-dark-grey);
+  }
+
+  #app { height: 100vh; overflow: hidden; }
+
+  button, input, select, textarea {
+    font-family: inherit;
+  }
+
+  /* Tabular numbers for scores, timers, counts */
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* Prevent text selection on interactive elements */
+  button { user-select: none; -webkit-user-select: none; }
+
+  /* Smooth transitions between screens */
+  #app > div { animation: fadeIn 0.15s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Scrollbar style for player list */
+  #player-grid::-webkit-scrollbar { width: 4px; }
+  #player-grid::-webkit-scrollbar-track { background: transparent; }
+  #player-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+  /* QR canvas border */
+  #qr-canvas { border: 3px solid #fff; display: block; }
+
+  textarea:focus { outline: none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="src/host.js"></script>
+</body>
+</html>

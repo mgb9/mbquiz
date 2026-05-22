@@ -1,0 +1,94 @@
+{
+  "title": "eCommerce & Digital Marketing Essentials",
+  "defaultTime": 30,
+  "questions": [
+    {
+      "q": "Which of Nielsen's 10 usability heuristics is most directly concerned with preventing user errors?",
+      "answers": [
+        "Visibility of system status",
+        "Error prevention",
+        "Aesthetic and minimalist design",
+        "Help and documentation"
+      ],
+      "correct": 1,
+      "time": 30
+    },
+    {
+      "q": "What does 'A/B testing' involve in a digital marketing context?",
+      "answers": [
+        "Testing two versions of a page to see which performs better",
+        "Comparing paid and organic search results",
+        "Running ads on two different platforms simultaneously",
+        "Comparing email open rates across two campaigns"
+      ],
+      "correct": 0,
+      "time": 30
+    },
+    {
+      "q": "In e-commerce, what is the term for a user who adds items to a cart but doesn't complete the purchase?",
+      "answers": [
+        "Bounce rate",
+        "Cart abandonment",
+        "Churn",
+        "Conversion failure"
+      ],
+      "correct": 1,
+      "time": 25
+    },
+    {
+      "q": "Which metric best measures the long-term revenue value a customer generates for a business?",
+      "answers": [
+        "Customer acquisition cost (CAC)",
+        "Net promoter score (NPS)",
+        "Customer lifetime value (CLV)",
+        "Return on ad spend (ROAS)"
+      ],
+      "correct": 2,
+      "time": 30
+    },
+    {
+      "q": "What is the primary purpose of a sprint retrospective in Scrum?",
+      "answers": [
+        "To plan the next sprint's work",
+        "To inspect and adapt the team's process",
+        "To demonstrate completed features to stakeholders",
+        "To groom the product backlog"
+      ],
+      "correct": 1,
+      "time": 30
+    },
+    {
+      "q": "In SEO, what does a 'canonical tag' signal to search engines?",
+      "answers": [
+        "The page should be excluded from indexing",
+        "This is the preferred version of a duplicate page",
+        "The page loads faster than alternatives",
+        "Mobile users should be redirected"
+      ],
+      "correct": 1,
+      "time": 35
+    },
+    {
+      "q": "What is 'dark social' in the context of digital marketing analytics?",
+      "answers": [
+        "Negative sentiment on social media",
+        "Paid social media advertising",
+        "Sharing via private channels that analytics tools can't track",
+        "Social media posts that are hidden from public view"
+      ],
+      "correct": 2,
+      "time": 30
+    },
+    {
+      "q": "Which e-commerce pricing strategy involves charging different prices to different customer segments for the same product?",
+      "answers": [
+        "Cost-plus pricing",
+        "Price discrimination",
+        "Penetration pricing",
+        "Bundle pricing"
+      ],
+      "correct": 1,
+      "time": 30
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "wmg-quiz-party",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev":    "partykit dev",
+    "deploy": "partykit deploy"
+  },
+  "dependencies": {
+    "partykit":   "^0.0.111",
+    "partysocket": "^1.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

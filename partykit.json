@@ -1,0 +1,4 @@
+{
+  "name": "wmg-quiz",
+  "main": "party/server.ts"
+}
