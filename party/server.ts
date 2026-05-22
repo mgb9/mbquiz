@@ -46,7 +46,15 @@ export default class QuizServer implements Party.Server {
   // ── Connection lifecycle ─────────────────────────────────────────────────
 
   onConnect(conn: Party.Connection) {
-    // New raw connection — don't do anything until join/rejoin arrives.
+    // If a host connects (or reconnects) during the lobby, immediately send
+    // the current player list so the count is never stale after a reconnect.
+    if (this.phase === "lobby") {
+      conn.send(JSON.stringify({
+        type:    "player_list",
+        players: Array.from(this.players.values()).map(p => ({ name: p.name })),
+        count:   this.players.size,
+      }));
+    }
   }
 
   onClose(conn: Party.Connection) {

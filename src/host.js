@@ -58,6 +58,7 @@ function connect(room) {
   if (ws) ws.close();
   const url = `wss://${PARTYKIT_HOST}/party/${encodeURIComponent(room)}`;
   ws = new WebSocket(url);
+  const thisWs = ws; // capture so the close handler knows if it's been superseded
 
   ws.addEventListener('open', () => {
     console.log('[WMG Quiz Host] connected to room:', room);
@@ -66,6 +67,8 @@ function connect(room) {
     try { onMessage(JSON.parse(e.data)); } catch (err) { console.error(err); }
   });
   ws.addEventListener('close', () => {
+    // If ws has already been replaced by a newer connect() call, don't reconnect.
+    if (ws !== thisWs) return;
     if (S.phase !== 'setup') {
       setTimeout(() => connect(S.room), 2000);
     }
