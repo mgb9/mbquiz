@@ -96,11 +96,37 @@ function onMessage(msg) {
       if (S.phase === 'question') updateAnsweredTicker();
       break;
 
-    case 'pre_question':
+    // All game-flow transitions are server-authoritative.
+    // The host sends 'next' / 'begin_timer' and waits for the broadcast here.
     case 'reveal':
+      S.revealData = msg;
+      if (S.phase === 'question') setPhase('reveal');
+      break;
+
     case 'leaderboard':
+      if (S.phase === 'reveal') {
+        S.leaderboard = msg.leaderboard || [];
+        S.qIndex      = msg.questionIndex + 1;
+        S.qTotal      = msg.totalQuestions;
+        setPhase('leaderboard');
+      }
+      break;
+
+    case 'pre_question':
+      if (S.phase === 'leaderboard') {
+        S.qIndex      = msg.index + 1;
+        S.qTotal      = msg.total;
+        S.currentQ    = msg.question;
+        S.answeredCount = 0;
+        setPhase('pre_question');
+      }
+      break;
+
     case 'game_over':
-      // Host drives these transitions; just update state if server echoes
+      if (S.phase === 'leaderboard') {
+        S.leaderboard = msg.leaderboard || [];
+        setPhase('final');
+      }
       break;
   }
 }
@@ -726,28 +752,8 @@ function bindQuestion() {
   document.getElementById('reveal-btn').addEventListener('click', () => {
     stopCountdown();
     send({ type: 'next' });
-    // Show a loading screen and wait for the server's reveal broadcast.
-    // Do NOT call setPhase('reveal') here — S.revealData is still null,
-    // htmlReveal() would return a blank div, and bindReveal() would crash
-    // trying to attach a listener to a non-existent #show-lb-btn.
-    // renderRevealAfterNext() calls setPhase('reveal') once data arrives.
-    renderRevealAfterNext();
-  });
-}
-
-function renderRevealAfterNext() {
-  // Show a brief loading state while the server calculates scores and broadcasts
-  app.innerHTML = `<div style="height:100vh;background:${C.dark};display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-family:Lato,sans-serif;font-size:18px;font-weight:700;letter-spacing:1px">Calculating scores…</div>`;
-
-  ws.addEventListener('message', function handler(e) {
-    try {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'reveal') {
-        ws.removeEventListener('message', handler);
-        S.revealData = msg;
-        setPhase('reveal');
-      }
-    } catch {}
+    // Show a brief loading state; onMessage('reveal') will call setPhase('reveal').
+    app.innerHTML = `<div style="height:100vh;background:${C.dark};display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-family:Lato,sans-serif;font-size:18px;font-weight:700;letter-spacing:1px">Calculating scores…</div>`;
   });
 }
 
@@ -817,20 +823,7 @@ function htmlReveal() {
 function bindReveal() {
   document.getElementById('show-lb-btn').addEventListener('click', () => {
     send({ type: 'next' });
-
-    // Wait for leaderboard message from server
-    ws.addEventListener('message', function handler(e) {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'leaderboard') {
-          ws.removeEventListener('message', handler);
-          S.leaderboard = msg.leaderboard || [];
-          S.qIndex      = msg.questionIndex + 1;
-          S.qTotal      = msg.totalQuestions;
-          setPhase('leaderboard');
-        }
-      } catch {}
-    });
+    // onMessage('leaderboard') will call setPhase('leaderboard').
   });
 }
 
@@ -892,25 +885,7 @@ function htmlLeaderboard() {
 function bindLeaderboard() {
   document.getElementById('next-q-btn').addEventListener('click', () => {
     send({ type: 'next' });
-
-    // Wait for pre_question or game_over
-    ws.addEventListener('message', function handler(e) {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'pre_question') {
-          ws.removeEventListener('message', handler);
-          S.qIndex   = msg.index + 1;
-          S.qTotal   = msg.total;
-          S.currentQ = msg.question;
-          S.answeredCount = 0;
-          setPhase('pre_question');
-        } else if (msg.type === 'game_over') {
-          ws.removeEventListener('message', handler);
-          S.leaderboard = msg.leaderboard || [];
-          setPhase('final');
-        }
-      } catch {}
-    });
+    // onMessage('pre_question') or onMessage('game_over') will drive the transition.
   });
 }
 
