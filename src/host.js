@@ -726,12 +726,11 @@ function bindQuestion() {
   document.getElementById('reveal-btn').addEventListener('click', () => {
     stopCountdown();
     send({ type: 'next' });
-    // Build reveal data from tracked state
-    setPhase('reveal');
-    // The server will broadcast reveal; we just show a loading reveal screen
-    // Actually we construct the UI from server data when reveal msg arrives
-    // For host, we trigger the reveal and wait for server echo... but host doesn't
-    // get the reveal msg (it broadcasts to all). Let's make host request and render:
+    // Show a loading screen and wait for the server's reveal broadcast.
+    // Do NOT call setPhase('reveal') here — S.revealData is still null,
+    // htmlReveal() would return a blank div, and bindReveal() would crash
+    // trying to attach a listener to a non-existent #show-lb-btn.
+    // renderRevealAfterNext() calls setPhase('reveal') once data arrives.
     renderRevealAfterNext();
   });
 }
