@@ -1,93 +1,93 @@
 {
-  "title": "eCommerce & Digital Marketing Essentials",
+  "title": "WMG AQA Essentials — Assessment, Rubrics, MA1 & CA1",
   "defaultTime": 30,
   "questions": [
     {
-      "q": "Which of Nielsen's 10 usability heuristics is most directly concerned with preventing user errors?",
+      "q": "When are assessments due to be submitted to AQ for the 26/27 assessment approval cycle?",
       "answers": [
-        "Visibility of system status",
-        "Error prevention",
-        "Aesthetic and minimalist design",
-        "Help and documentation"
-      ],
-      "correct": 1,
-      "time": 30
-    },
-    {
-      "q": "What does 'A/B testing' involve in a digital marketing context?",
-      "answers": [
-        "Testing two versions of a page to see which performs better",
-        "Comparing paid and organic search results",
-        "Running ads on two different platforms simultaneously",
-        "Comparing email open rates across two campaigns"
+        "Friday 26th June 2026",
+        "Friday 18th September 2026",
+        "Monday 1st June 2026",
+        "Friday 19th September 2025"
       ],
       "correct": 0,
       "time": 30
     },
     {
-      "q": "In e-commerce, what is the term for a user who adds items to a cart but doesn't complete the purchase?",
+      "q": "What must assessment rubrics contain to support faster and easier feedback?",
       "answers": [
-        "Bounce rate",
-        "Cart abandonment",
-        "Churn",
-        "Conversion failure"
-      ],
-      "correct": 1,
-      "time": 25
-    },
-    {
-      "q": "Which metric best measures the long-term revenue value a customer generates for a business?",
-      "answers": [
-        "Customer acquisition cost (CAC)",
-        "Net promoter score (NPS)",
-        "Customer lifetime value (CLV)",
-        "Return on ad spend (ROAS)"
-      ],
-      "correct": 2,
-      "time": 30
-    },
-    {
-      "q": "What is the primary purpose of a sprint retrospective in Scrum?",
-      "answers": [
-        "To plan the next sprint's work",
-        "To inspect and adapt the team's process",
-        "To demonstrate completed features to stakeholders",
-        "To groom the product backlog"
-      ],
-      "correct": 1,
-      "time": 30
-    },
-    {
-      "q": "In SEO, what does a 'canonical tag' signal to search engines?",
-      "answers": [
-        "The page should be excluded from indexing",
-        "This is the preferred version of a duplicate page",
-        "The page loads faster than alternatives",
-        "Mobile users should be redirected"
+        "A single generic mark band description used across all modules",
+        "Learning outcome-specific wording, adapting the standard wording as appropriate",
+        "Marks allocated separately for presentation, spelling, punctuation and grammar",
+        "The staff-facing marking guidance copied into each row"
       ],
       "correct": 1,
       "time": 35
     },
     {
-      "q": "What is 'dark social' in the context of digital marketing analytics?",
+      "q": "True or false: an assessment can stay the same from one academic year to the next.",
       "answers": [
-        "Negative sentiment on social media",
-        "Paid social media advertising",
-        "Sharing via private channels that analytics tools can't track",
-        "Social media posts that are hidden from public view"
+        "True — provided the learning outcomes have not changed",
+        "True — provided the external examiner approves no change",
+        "False — assessments must be substantially different to last year and changed every academic year",
+        "False — but only the resit assessment needs to change"
+      ],
+      "correct": 2,
+      "time": 35
+    },
+    {
+      "q": "By what date must New Course Approvals or updates to courses (CA1/MA1 paperwork) for 28/29 launch be submitted?",
+      "answers": [
+        "Friday 19th September 2025",
+        "Friday 11th September 2026",
+        "Friday 18th September 2026",
+        "Friday 26th June 2026"
+      ],
+      "correct": 2,
+      "time": 35
+    },
+    {
+      "q": "The MA1 updates being submitted in the next academic year are for which launch year?",
+      "answers": [
+        "26/27",
+        "27/28",
+        "28/29",
+        "29/30"
       ],
       "correct": 2,
       "time": 30
     },
     {
-      "q": "Which e-commerce pricing strategy involves charging different prices to different customer segments for the same product?",
+      "q": "How many times can an assessment normally be used within the same academic year before it must be replaced?",
       "answers": [
-        "Cost-plus pricing",
-        "Price discrimination",
-        "Penetration pricing",
-        "Bundle pricing"
+        "Once only",
+        "Up to twice",
+        "A maximum of three times",
+        "Unlimited, provided the rubric is updated"
+      ],
+      "correct": 2,
+      "time": 30
+    },
+    {
+      "q": "Which document is student-facing and must be provided alongside the assessment brief?",
+      "answers": [
+        "The staff-facing marking guidance",
+        "The student-facing marking rubric",
+        "The model answers",
+        "The Internal Reviewer's checklist"
       ],
       "correct": 1,
+      "time": 30
+    },
+    {
+      "q": "Within how many University working days must marks and feedback normally be returned to students?",
+      "answers": [
+        "10 working days",
+        "15 working days",
+        "20 working days",
+        "25 working days"
+      ],
+      "correct": 2,
       "time": 30
     }
   ]
