@@ -163,23 +163,37 @@ function _once(seq, bpm, wave, vol) {
   _sched(seq, bpm, wave, vol, ctx.currentTime + 0.05);
 }
 
-// Lobby: upbeat C-major melody (triangle, 130 BPM)
+// Lobby: 4-phrase C-major melody, ~15s loop — long enough not to feel repetitive
 function startLobbyMusic() {
   _loop([
-    [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.E5,.5],
-    [N.C5,.5],[N.D5,.5],[N.E5,1],
-    [N.G5,.5],[N.E5,.5],[N.D5,.5],[N.C5,.5],
-    [N.G4,2],
+    // Phrase A — C major bounce
+    [N.E5,.5],[N.G5,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],[N.D5,.5],[N.C5,1],
+    [N.G5,.5],[N.E5,.5],[N.D5,.5],[N.C5,.5],[N.G4,1.5],[0,.5],
+    // Phrase B — up through G and back
+    [N.G5,.5],[N.A5,.5],[N.C6,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],[N.D5,1],
+    [N.F5,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],[N.D5,1.5],[0,.5],
+    // Phrase C — F major colour
+    [N.F5,.5],[N.A5,.5],[N.C6,.5],[N.A5,.5],[N.F5,.5],[N.G5,.5],[N.A5,1],
+    [N.C6,.5],[N.A5,.5],[N.G5,.5],[N.F5,.5],[N.E5,1.5],[0,.5],
+    // Phrase D — home to C
+    [N.E5,.5],[N.G5,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],[N.D5,.5],[N.C5,1],
+    [N.G4,.5],[N.A4,.5],[N.C5,.5],[N.D5,.5],[N.C5,2],
   ], 130, 'triangle', 0.15);
 }
 
-// Question: tense A-minor rhythmic pulse (square, 140 BPM)
+// Question: 16-beat tense A-minor pulse (~7s loop) — two varied phrases
 function startQuestionMusic() {
   _loop([
+    // Phrase 1
     [N.A4,.5],[0,.5],[N.A4,.5],[0,.5],
     [N.G4,.5],[0,.5],[N.A4,.5],[0,.5],
-    [N.A4,.5],[N.C5,.25],[N.B4,.25],[N.A4,1],
-    [N.G4,2],
+    [N.A4,.5],[N.C5,.25],[N.B4,.25],[N.A4,.5],[N.G4,.5],
+    [N.A4,2],
+    // Phrase 2 — slightly different rhythm
+    [N.A4,.5],[0,.25],[N.A4,.25],[N.A4,.5],[0,.5],
+    [N.B4,.5],[0,.5],[N.A4,.5],[0,.5],
+    [N.C5,.5],[N.B4,.5],[N.A4,.5],[N.G4,.5],
+    [N.A4,2],
   ], 140, 'square', 0.09);
 }
 
@@ -188,6 +202,55 @@ function playRevealStinger() {
   _once([
     [N.C5,.2],[N.E5,.2],[N.G5,.2],[N.C6,.45],
   ], 160, 'triangle', 0.18);
+}
+
+// Podium: triumphant C-major loop
+function startPodiumMusic() {
+  _loop([
+    [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
+    [N.G5,.5],[N.C6,.5],[N.G5,1],
+    [N.E5,.5],[N.G5,.5],[N.C6,.5],[N.G5,.5],
+    [N.C6,2],
+  ], 108, 'triangle', 0.16);
+}
+
+// Confetti burst using WMG brand colours — pure canvas, no library
+function launchConfetti() {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;';
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx2 = canvas.getContext('2d');
+  const cols  = [C.red, C.blue, C.gold, C.lime, C.orange, '#fff', '#fff'];
+  const pieces = Array.from({length: 160}, () => ({
+    x:  Math.random() * canvas.width,
+    y: -20 - Math.random() * 180,
+    vx: (Math.random() - 0.5) * 7,
+    vy:  3 + Math.random() * 5,
+    g:   0.13,
+    col: cols[Math.floor(Math.random() * cols.length)],
+    w:   7 + Math.random() * 7,
+    h:  10 + Math.random() * 8,
+    rot: Math.random() * 360,
+    rv: (Math.random() - 0.5) * 14,
+  }));
+  function draw() {
+    ctx2.clearRect(0, 0, canvas.width, canvas.height);
+    let any = false;
+    pieces.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += p.g; p.rot += p.rv;
+      if (p.y < canvas.height + 40) any = true;
+      ctx2.save();
+      ctx2.translate(p.x, p.y);
+      ctx2.rotate(p.rot * Math.PI / 180);
+      ctx2.fillStyle = p.col;
+      ctx2.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx2.restore();
+    });
+    if (any) requestAnimationFrame(draw); else canvas.remove();
+  }
+  draw();
 }
 
 // Floating mute button — appended after each screen render
@@ -263,6 +326,7 @@ function setPhase(phase) {
   // Music hooks (question music is started by doStartTimerOnce, not here)
   if      (phase === 'lobby')   startLobbyMusic();
   else if (phase === 'reveal')  { stopMusic(); playRevealStinger(); }
+  else if (phase === 'final')   startPodiumMusic();
   else if (phase !== 'question') stopMusic();
 }
 
@@ -965,6 +1029,9 @@ function htmlLeaderboard() {
   const palette = [C.red, C.blue, C.gold, C.lime, C.orange];
 
   return `
+<style>
+@keyframes rowIn { from { transform:translateX(80px);opacity:0 } to { transform:translateX(0);opacity:1 } }
+</style>
 <div style="height:100vh;background:${C.dark};color:#fff;font-family:Lato,sans-serif;padding:52px 56px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:hidden">
   ${SECTOR_BAR}
   ${miniHeader(true)}
@@ -980,24 +1047,27 @@ function htmlLeaderboard() {
     </div>
   </div>
 
-  <!-- Top 5 rows -->
+  <!-- Top 5 rows — animate in from the right, staggered -->
   <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
     ${board.map((p, i) => {
       const isTop = i === 0;
       return `
       <div style="display:flex;align-items:center;gap:22px;padding:16px 22px;
                   background:${isTop ? C.orange : 'rgba(255,255,255,0.06)'};
-                  border-left:${isTop ? 'none' : `4px solid ${TILES[i % 4].color}`}">
+                  border-left:${isTop ? 'none' : `4px solid ${TILES[i % 4].color}`};
+                  animation:rowIn 0.45s cubic-bezier(0.2,0,0,1) both;
+                  animation-delay:${i * 0.1}s">
         <div style="font-size:34px;font-weight:900;width:56px;font-variant-numeric:tabular-nums;line-height:1;color:${isTop ? '#fff' : 'rgba(255,255,255,0.4)'}">${p.rank}</div>
         <div style="width:44px;height:44px;border-radius:50%;background:${palette[i % palette.length]};
                     display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;flex-shrink:0">
           ${escHtml(p.name.trim()[0]?.toUpperCase() || '?')}
         </div>
         <div style="flex:1;font-size:24px;font-weight:800">${escHtml(p.name)}</div>
-        <div style="font-size:13px;font-weight:800;padding:4px 10px;
+        <div class="score-val" data-score="${p.score}"
+             style="font-size:13px;font-weight:800;padding:4px 10px;
                     background:${isTop ? 'rgba(255,255,255,0.18)' : 'rgba(193,216,47,0.18)'};
                     color:${isTop ? '#fff' : C.lime};letter-spacing:0.5px">
-          ${p.score.toLocaleString()} pts
+          0 pts
         </div>
       </div>`;
     }).join('')}
@@ -1018,6 +1088,19 @@ function bindLeaderboard() {
     send({ type: 'next' });
     // onMessage('pre_question') or onMessage('game_over') will drive the transition.
   });
+
+  // Count each score up from 0 → final value
+  document.querySelectorAll('.score-val').forEach(el => {
+    const target = parseInt(el.dataset.score, 10) || 0;
+    if (!target) { el.textContent = '0 pts'; return; }
+    let cur = 0;
+    const step = Math.ceil(target / 28);
+    const iv = setInterval(() => {
+      cur = Math.min(cur + step, target);
+      el.textContent = cur.toLocaleString() + ' pts';
+      if (cur >= target) clearInterval(iv);
+    }, 35);
+  });
 }
 
 // ── 7. Final / Podium ──────────────────────────────────────────────────────
@@ -1029,7 +1112,14 @@ function htmlFinal() {
   const podiumHeights = ['62%', '88%', '48%'];
   const podiumColors  = [C.blue, C.orange, C.lime];
 
+  // Dramatic reveal: 3rd rises first, then 2nd, then 1st
+  // col 0 = left = 2nd place, col 1 = centre = 1st place, col 2 = right = 3rd place
+  const podiumDelays = ['0.45s', '0.75s', '0.15s'];
+
   return `
+<style>
+@keyframes riseUp { from { transform:scaleY(0) } to { transform:scaleY(1) } }
+</style>
 <div style="height:100vh;background:${C.dark};color:#fff;font-family:Lato,sans-serif;padding:52px 56px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:hidden">
   ${SECTOR_BAR}
 
@@ -1048,7 +1138,7 @@ function htmlFinal() {
     <div style="font-size:17px;color:rgba(255,255,255,0.5);margin-top:6px">${escHtml(S.quizTitle)}</div>
   </div>
 
-  <!-- Podium -->
+  <!-- Podium — bars animate up from bottom (3rd → 2nd → 1st) -->
   <div style="flex:1;display:grid;grid-template-columns:1fr 1.1fr 1fr;align-items:end;gap:20px;padding:0 80px;min-height:0">
     ${slots.map((pidx, col) => {
       const p = podium[pidx];
@@ -1056,6 +1146,7 @@ function htmlFinal() {
       const rank  = p.rank;   // from leaderboard data, not from column position
       const color = podiumColors[col];
       const h     = podiumHeights[col];
+      const delay = podiumDelays[col];
       const ord   = rank === 1 ? 'st' : rank === 2 ? 'nd' : 'rd';
       return `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
@@ -1067,7 +1158,8 @@ function htmlFinal() {
         <div style="font-size:22px;font-weight:900;margin-top:8px">${escHtml(p.name)}</div>
         <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);letter-spacing:0.5px;font-variant-numeric:tabular-nums">${p.score.toLocaleString()} pts</div>
         <div style="width:100%;height:${h};margin-top:12px;background:${color};
-                    display:flex;align-items:flex-start;justify-content:center;padding-top:16px">
+                    display:flex;align-items:flex-start;justify-content:center;padding-top:16px;
+                    transform-origin:bottom;animation:riseUp 0.7s cubic-bezier(0.2,0,0,1) ${delay} both">
           <div style="font-size:72px;font-weight:900;color:#fff;line-height:1">${rank}</div>
         </div>
       </div>`;
@@ -1095,6 +1187,7 @@ function htmlFinal() {
 }
 
 function bindFinal() {
+  launchConfetti();
   document.getElementById('csv-btn')?.addEventListener('click', downloadCSV);
   document.getElementById('play-again-btn')?.addEventListener('click', () => {
     window.location.reload();
