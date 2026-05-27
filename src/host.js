@@ -518,11 +518,22 @@ function htmlSetup() {
 }`;
 
   return `
-<div style="min-height:100vh;background:${C.chalk};color:${C.ink};font-family:Lato,sans-serif;padding:56px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:auto">
+<style>
+  #su-wrap { padding:56px }
+  #su-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:36px; flex:1; min-height:0 }
+  @media (max-width:860px) {
+    #su-wrap { padding:32px }
+    #su-grid { grid-template-columns:1fr }
+  }
+  @media (max-width:520px) {
+    #su-wrap { padding:20px }
+  }
+</style>
+<div id="su-wrap" style="min-height:100vh;background:${C.chalk};color:${C.ink};font-family:Lato,sans-serif;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:auto">
   <div style="position:absolute;top:0;right:0;height:6px;width:40%;background:${C.orange}"></div>
 
   <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:36px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:36px;flex-wrap:wrap;gap:12px">
     ${MARK_LIGHT}
     <div style="display:flex;align-items:center;gap:8px;color:${C.grey};font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">
       <svg width="8" height="8" viewBox="0 0 10 10"><polygon points="0,2 10,5 0,8" fill="${C.orange}"/></svg>
@@ -533,14 +544,14 @@ function htmlSetup() {
   <!-- Title block -->
   <div style="margin-bottom:36px">
     ${ACCENT_LINE}
-    <div style="font-size:52px;font-weight:900;line-height:1.0;letter-spacing:-1.5px">Start a new game.</div>
-    <div style="font-size:18px;font-weight:400;color:${C.inkSoft};margin-top:10px;max-width:640px">
+    <div style="font-size:clamp(28px,5vw,52px);font-weight:900;line-height:1.0;letter-spacing:-1.5px">Start a new game.</div>
+    <div style="font-size:clamp(14px,2vw,18px);font-weight:400;color:${C.inkSoft};margin-top:10px;max-width:640px">
       Paste or upload a question bank. Students join with a QR code or room name.
     </div>
   </div>
 
-  <!-- Two-column body -->
-  <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:36px;flex:1;min-height:0">
+  <!-- Two-column body (stacks on small screens) -->
+  <div id="su-grid">
 
     <!-- Left: JSON editor -->
     <div style="display:flex;flex-direction:column;gap:12px">
@@ -749,23 +760,36 @@ function htmlLobby() {
   const joinURL = `${window.location.origin}${window.location.pathname.replace('index.html', '')}play.html?room=${encodeURIComponent(S.room)}`;
 
   return `
-<div style="height:100vh;background:${C.dark};color:#fff;font-family:Lato,sans-serif;padding:56px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:hidden">
+<style>
+  #lb-wrap { padding:56px; overflow:hidden }
+  #lb-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:48px; flex:1; min-height:0 }
+  #lb-right { border-left:1px solid rgba(255,255,255,0.12); padding-left:36px }
+  @media (max-width:860px) {
+    #lb-wrap { padding:32px; overflow:auto }
+    #lb-grid { grid-template-columns:1fr; gap:28px }
+    #lb-right { border-left:none; padding-left:0; border-top:1px solid rgba(255,255,255,0.12); padding-top:24px }
+  }
+  @media (max-width:520px) {
+    #lb-wrap { padding:20px }
+  }
+</style>
+<div id="lb-wrap" style="height:100vh;background:${C.dark};color:#fff;font-family:Lato,sans-serif;box-sizing:border-box;display:flex;flex-direction:column;position:relative">
   ${SECTOR_BAR}
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:10px">
     ${MARK_DARK}
     <div style="color:rgba(255,255,255,0.55);font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase">
       ${escHtml(S.quizTitle)}
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:48px;flex:1;min-height:0">
+  <div id="lb-grid">
 
     <!-- Left: join instructions + QR -->
     <div style="display:flex;flex-direction:column">
       <div style="font-size:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${C.orange};margin-bottom:14px">Join the game</div>
 
-      <div style="display:flex;gap:36px;align-items:flex-start;margin-bottom:auto">
+      <div style="display:flex;gap:36px;align-items:flex-start;margin-bottom:auto;flex-wrap:wrap">
         <!-- QR code -->
         <div style="flex-shrink:0">
           <canvas id="qr-canvas" style="display:block"></canvas>
@@ -796,8 +820,8 @@ function htmlLobby() {
       </div>
     </div>
 
-    <!-- Right: players list -->
-    <div style="display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,0.12);padding-left:36px;min-height:0;overflow:hidden">
+    <!-- Right: players list (border/padding managed by #lb-right media query) -->
+    <div id="lb-right" style="display:flex;flex-direction:column;min-height:0;overflow:hidden">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;flex-shrink:0">
         <div style="font-size:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase">Players in</div>
         <div id="player-count-big" style="font-size:36px;font-weight:900;color:${C.lime};font-variant-numeric:tabular-nums">0</div>
@@ -913,6 +937,29 @@ function bindPreQuestion() {
   document.addEventListener('keydown', onKey);
 }
 
+// ── Shared tile-grid helpers ───────────────────────────────────────────────
+
+/**
+ * Renders the answer tiles for the host question screen.
+ * Supports 2, 3, or 4 answers; 3rd option spans full width when count === 3.
+ */
+function hostAnswerTiles(q) {
+  const count = q.answers.length;
+  const rows  = count <= 2 ? '' : ';grid-template-rows:1fr 1fr';
+  return `
+  <div style="display:grid;grid-template-columns:1fr 1fr${rows};gap:14px;flex:1;min-height:0">
+    ${TILES.slice(0, count).map((t, i) => `
+    <div style="background:${t.color};padding:20px 24px;display:flex;align-items:center;gap:16px;overflow:hidden;${count === 3 && i === 2 ? 'grid-column:1/-1' : ''}">
+      <div style="width:52px;height:52px;background:rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        ${shapeSVG(t.shape, 34, '#fff')}
+      </div>
+      <div style="font-family:Lato,sans-serif;font-weight:800;font-size:24px;line-height:1.15;color:#fff;text-wrap:balance">
+        ${escHtml(q.answers[i] || '')}
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
 // ── 4. Question ────────────────────────────────────────────────────────────
 function htmlQuestion() {
   const q   = S.currentQ;
@@ -952,18 +999,8 @@ function htmlQuestion() {
     0 of ${S.totalPlayers} answered
   </div>
 
-  <!-- Answer tiles 2×2 -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:14px;flex:1;min-height:0">
-    ${TILES.map((t, i) => `
-      <div style="background:${t.color};padding:20px 24px;display:flex;align-items:center;gap:16px;overflow:hidden">
-        <div style="width:52px;height:52px;background:rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          ${shapeSVG(t.shape, 34, '#fff')}
-        </div>
-        <div style="font-family:Lato,sans-serif;font-weight:800;font-size:24px;line-height:1.15;color:#fff;text-wrap:balance">
-          ${escHtml(q.answers[i] || '')}
-        </div>
-      </div>`).join('')}
-  </div>
+  <!-- Answer tiles — count driven by q.answers.length (2, 3, or 4) -->
+  ${hostAnswerTiles(q)}
 
   <!-- Manual reveal button (bottom-right) -->
   <div style="display:flex;justify-content:flex-end;margin-top:18px">
@@ -1030,9 +1067,9 @@ function htmlReveal() {
     <div style="font-size:26px;font-weight:800;line-height:1.25">${escHtml(question.q)}</div>
   </div>
 
-  <!-- Bar chart -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;height:150px;align-items:end;margin-bottom:14px">
-    ${counts.map((c, i) => {
+  <!-- Bar chart — N columns matching answer count -->
+  <div style="display:grid;grid-template-columns:repeat(${question.answers.length},1fr);gap:14px;height:150px;align-items:end;margin-bottom:14px">
+    ${counts.slice(0, question.answers.length).map((c, i) => {
       const h          = Math.round((c / maxC) * 100);
       const isCorrect  = i === correct;
       return `
@@ -1043,8 +1080,8 @@ function htmlReveal() {
     }).join('')}
   </div>
 
-  <!-- Answer tiles (4 across) -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;flex:1;min-height:0">
+  <!-- Answer tiles — N across matching answer count -->
+  <div style="display:grid;grid-template-columns:repeat(${question.answers.length},1fr);gap:14px;flex:1;min-height:0">
     ${question.answers.map((a, i) => {
       const isCorrect = i === correct;
       return `

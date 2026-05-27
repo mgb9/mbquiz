@@ -169,7 +169,8 @@ export default class QuizServer implements Party.Server {
     if (!name || this.answers.has(name)) return;
 
     const idx = Number(msg.answerIndex);
-    if (!Number.isInteger(idx) || idx < 0 || idx > 3) return;
+    const maxIdx = (this.questions[this.currentQ]?.answers?.length ?? 4) - 1;
+    if (!Number.isInteger(idx) || idx < 0 || idx > maxIdx) return;
 
     this.answers.set(name, { answerIndex: idx, answeredAt: Date.now() });
 
@@ -261,7 +262,7 @@ export default class QuizServer implements Party.Server {
   broadcastReveal() {
     const q          = this.questions[this.currentQ];
     const timeLimitMs = (q.time ?? this.defaultTime) * 1000;
-    const counts      = [0, 0, 0, 0];
+    const counts      = Array(q.answers.length).fill(0);
     const roundScores: Record<string, number> = {};
     const chosen:      Record<string, number> = {};
 
@@ -356,7 +357,7 @@ export default class QuizServer implements Party.Server {
 
     } else if (this.phase === "reveal") {
       // Re-send the reveal so the player sees results
-      const counts      = [0, 0, 0, 0];
+      const counts      = Array(q.answers.length).fill(0);
       const roundScores: Record<string, number> = {};
       const chosen:      Record<string, number> = {};
       const timeLimitMs = (q.time ?? this.defaultTime) * 1000;

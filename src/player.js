@@ -515,6 +515,16 @@ function htmlWaiting() {
 </div>`;
 }
 
+// ── Tile-grid helper ───────────────────────────────────────────────────────
+// Returns { gridStyle, span(i) } for N-answer layouts.
+// count=2 → single row; count=3 → 3rd tile spans full width; count=4 → 2×2.
+function tileLayout(count) {
+  const rows = count <= 2 ? '' : ';grid-template-rows:1fr 1fr';
+  const gridStyle = `grid-template-columns:1fr 1fr${rows}`;
+  const span = i => count === 3 && i === 2 ? 'grid-column:1/-1;' : '';
+  return { gridStyle, span };
+}
+
 function htmlPreQuestion() {
   const q = S.currentQ;
   return `
@@ -535,13 +545,14 @@ function htmlPreQuestion() {
     <div style="font-size:21px;font-weight:800;line-height:1.3;text-wrap:balance">${escHtml(q.q)}</div>
   </div>
 
-  <!-- Disabled tiles (shape only, dimmed) -->
-  <div style="padding:8px 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    ${TILES.map(t => `
-      <div style="background:${t.color};opacity:0.35;height:90px;display:flex;align-items:center;justify-content:center">
+  <!-- Disabled tiles (shape only, dimmed) — count matches answer count -->
+  ${(() => { const { gridStyle, span } = tileLayout(q.answers?.length || 4);
+  return `<div style="padding:8px 16px 16px;display:grid;${gridStyle};gap:10px">
+    ${TILES.slice(0, q.answers?.length || 4).map((t, i) => `
+      <div style="background:${t.color};opacity:0.35;height:90px;display:flex;align-items:center;justify-content:center;${span(i)}">
         ${shapeSVG(t.shape, 44, '#fff')}
       </div>`).join('')}
-  </div>
+  </div>`; })()}
 
   <!-- Pulsing "get ready" indicator -->
   <div style="padding:0 22px 20px;text-align:center">
@@ -573,18 +584,19 @@ function htmlQuestion() {
     <div style="font-size:19px;font-weight:800;line-height:1.3;text-wrap:balance">${escHtml(q.q)}</div>
   </div>
 
-  <!-- Answer tiles — fill remaining height -->
-  <div style="flex:1;padding:6px 16px 16px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;min-height:0">
-    ${TILES.map((t, i) => `
-      <button data-answer="${i}"
-        style="background:${t.color};border:none;border-radius:0;cursor:pointer;
-               display:flex;flex-direction:column;align-items:center;justify-content:center;
-               gap:10px;padding:12px;-webkit-tap-highlight-color:transparent;
-               touch-action:manipulation;position:relative;overflow:hidden">
-        ${shapeSVG(t.shape, 52, '#fff')}
-        <div style="background:rgba(0,0,0,0.22);padding:8px 10px;font-family:Lato,sans-serif;font-size:22px;font-weight:900;color:#fff;line-height:1">${t.letter}</div>
-      </button>`).join('')}
-  </div>
+  <!-- Answer tiles — fill remaining height; count driven by q.answers.length -->
+  ${(() => { const count = q?.answers?.length || 4; const { gridStyle, span } = tileLayout(count);
+  return `<div style="flex:1;padding:6px 16px 16px;display:grid;${gridStyle};gap:10px;min-height:0">
+    ${TILES.slice(0, count).map((t, i) => `
+    <button data-answer="${i}"
+      style="background:${t.color};border:none;border-radius:0;cursor:pointer;
+             display:flex;flex-direction:column;align-items:center;justify-content:center;
+             gap:10px;padding:12px;-webkit-tap-highlight-color:transparent;
+             touch-action:manipulation;position:relative;overflow:hidden;${span(i)}">
+      ${shapeSVG(t.shape, 52, '#fff')}
+      <div style="background:rgba(0,0,0,0.22);padding:8px 10px;font-family:Lato,sans-serif;font-size:22px;font-weight:900;color:#fff;line-height:1">${t.letter}</div>
+    </button>`).join('')}
+  </div>`; })()}
 
   <div style="padding:0 22px 10px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.35);text-transform:uppercase;text-align:center">
     Tap your answer
@@ -691,23 +703,26 @@ function htmlReveal() {
       </div>
     </div>
 
-    <!-- Answer grid — all 4 options; correct one highlighted, others dimmed -->
-    ${S.currentQ?.answers ? `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${TILES.map((t, i) => {
-        const isCorrect = i === correct;
-        const isChosen  = i === S.chosenAnswer;
-        return `
-        <div style="background:${t.color};opacity:${isCorrect ? 1 : 0.22};padding:10px 12px;
-                    outline:${isCorrect ? `3px solid ${C.lime}` : 'none'};outline-offset:-2px;
-                    display:flex;align-items:center;gap:8px;position:relative;box-sizing:border-box">
-          ${shapeSVG(t.shape, 18, '#fff')}
-          <div style="font-size:12px;font-weight:800;color:#fff;line-height:1.2;flex:1">${escHtml(S.currentQ.answers[i] || '')}</div>
-          ${isChosen && !isCorrect ? `<div style="font-size:9px;font-weight:800;color:#fff;opacity:0.9;letter-spacing:0.5px">←you</div>` : ''}
-          ${isCorrect ? `<div style="font-size:9px;font-weight:800;color:${C.lime};letter-spacing:0.5px">✓</div>` : ''}
-        </div>`;
-      }).join('')}
-    </div>` : ''}
+    <!-- Answer grid — N options; correct highlighted, others dimmed -->
+    ${S.currentQ?.answers ? (() => {
+      const count = S.currentQ.answers.length;
+      const { gridStyle, span } = tileLayout(count);
+      return `<div style="display:grid;${gridStyle};gap:8px">
+        ${TILES.slice(0, count).map((t, i) => {
+          const isCorrect = i === correct;
+          const isChosen  = i === S.chosenAnswer;
+          return `
+          <div style="background:${t.color};opacity:${isCorrect ? 1 : 0.22};padding:10px 12px;
+                      outline:${isCorrect ? `3px solid ${C.lime}` : 'none'};outline-offset:-2px;
+                      display:flex;align-items:center;gap:8px;position:relative;box-sizing:border-box;${span(i)}">
+            ${shapeSVG(t.shape, 18, '#fff')}
+            <div style="font-size:12px;font-weight:800;color:#fff;line-height:1.2;flex:1">${escHtml(S.currentQ.answers[i] || '')}</div>
+            ${isChosen && !isCorrect ? `<div style="font-size:9px;font-weight:800;color:#fff;opacity:0.9;letter-spacing:0.5px">←you</div>` : ''}
+            ${isCorrect ? `<div style="font-size:9px;font-weight:800;color:${C.lime};letter-spacing:0.5px">✓</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+    })() : ''}
 
     <!-- Rank -->
     ${rank > 0 ? `
