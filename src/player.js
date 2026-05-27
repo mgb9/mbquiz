@@ -687,9 +687,27 @@ function htmlReveal() {
       <div style="flex:1;font-size:13px;font-weight:600;opacity:0.85;line-height:1.35">
         ${wasCorrect
           ? `Speed bonus · answered in ${((Date.now() - S.questionStart) / 1000).toFixed(1)}s`
-          : `The right answer was ${escHtml(correctTile.letter)} — ${escHtml(correctTile.name)}`}
+          : `Correct answer: <strong>${escHtml(S.currentQ?.answers?.[correct] ?? correctTile.letter)}</strong>`}
       </div>
     </div>
+
+    <!-- Answer grid — all 4 options; correct one highlighted, others dimmed -->
+    ${S.currentQ?.answers ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${TILES.map((t, i) => {
+        const isCorrect = i === correct;
+        const isChosen  = i === S.chosenAnswer;
+        return `
+        <div style="background:${t.color};opacity:${isCorrect ? 1 : 0.22};padding:10px 12px;
+                    outline:${isCorrect ? `3px solid ${C.lime}` : 'none'};outline-offset:-2px;
+                    display:flex;align-items:center;gap:8px;position:relative;box-sizing:border-box">
+          ${shapeSVG(t.shape, 18, '#fff')}
+          <div style="font-size:12px;font-weight:800;color:#fff;line-height:1.2;flex:1">${escHtml(S.currentQ.answers[i] || '')}</div>
+          ${isChosen && !isCorrect ? `<div style="font-size:9px;font-weight:800;color:#fff;opacity:0.9;letter-spacing:0.5px">←you</div>` : ''}
+          ${isCorrect ? `<div style="font-size:9px;font-weight:800;color:${C.lime};letter-spacing:0.5px">✓</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>` : ''}
 
     <!-- Rank -->
     ${rank > 0 ? `
