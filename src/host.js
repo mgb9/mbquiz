@@ -47,8 +47,10 @@ const S = {
   currentQ:      null,     // { q, answers, time }
   questionStart: 0,
   revealData:    null,     // { correct, counts, question, roundScores, leaderboard }
-  leaderboard:   [],
-  timerInterval: null,
+  leaderboard:      [],
+  playerAnswers:    {},   // name → { qIndex: chosenAnswerIndex }
+  questionCorrects: [],   // correct answer index per question (populated on game_over)
+  timerInterval:    null,
 };
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
@@ -84,6 +86,7 @@ function send(msg) {
 // All music is synthesised via the Web Audio API — no files, no CDN.
 
 let _actx = null, _mGain = null, _muted = false, _loopTimer = null, _anodes = [];
+let _host5sWarned = false; // prevents the 5-second stinger from firing more than once per question
 
 // Note frequencies (Hz)
 const N = {
@@ -312,7 +315,9 @@ function onMessage(msg) {
 
     case 'game_over':
       if (S.phase === 'leaderboard') {
-        S.leaderboard = msg.leaderboard || [];
+        S.leaderboard      = msg.leaderboard      || [];
+        S.playerAnswers    = msg.playerAnswers     || {};
+        S.questionCorrects = (msg.questions || []).map(q => q.correct);
         setPhase('final');
       }
       break;
@@ -333,6 +338,7 @@ function setPhase(phase) {
 // ── Timer ──────────────────────────────────────────────────────────────────
 function startCountdown(durationSecs) {
   if (S.timerInterval) clearInterval(S.timerInterval);
+  _host5sWarned = false;
   const endTime = S.questionStart + durationSecs * 1000;
 
   function tick() {
@@ -364,6 +370,11 @@ function updateTimerDisplay(remaining, pct) {
     const dashOffset = circ * (1 - pct);
     circEl.style.strokeDashoffset = dashOffset;
     circEl.style.stroke = remaining <= 5 ? C.red : C.orange;
+  }
+  // 5-second audio warning (plays once per question)
+  if (remaining === 5 && !_host5sWarned) {
+    _host5sWarned = true;
+    _once([[N.G5, 0.12], [N.F5, 0.12], [N.C5, 0.22]], 220, 'triangle', 0.14); // descending G-F-C stinger
   }
 }
 
@@ -706,8 +717,29 @@ function bindSetup() {
     connect(room);
     setPhase('lobby');
 
-    // Generate the QR code — retry until qrcode.js CDN has loaded
-    const tryQR = () => { if (window.QRCode) renderQR(); else setTimeout(tryQR, 200); };
+    // Generate the QR code — retry until qrcode.js CDN has loaded.
+    // Give up after ~3 s (15 × 200 ms) and show a plain-text fallback.
+    let qrTries = 0;
+    const tryQR = () => {
+      if (window.QRCode) {
+        renderQR();
+      } else if (qrTries++ < 15) {
+        setTimeout(tryQR, 200);
+      } else {
+        // CDN didn't load — show join URL as text so the host can still announce it
+        const canvas = document.getElementById('qr-canvas');
+        if (canvas) {
+          const base    = window.location.href.replace(/[^/]*$/, '');
+          const joinURL = `${base}play.html?room=${encodeURIComponent(S.room)}`;
+          canvas.outerHTML = `
+            <div style="width:220px;padding:16px 18px;background:#fff;border:2px solid ${C.dark};
+                        font-family:Lato,sans-serif;font-size:11px;font-weight:700;color:${C.ink};line-height:1.5;word-break:break-all">
+              <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:${C.grey};margin-bottom:8px">QR unavailable — join at:</div>
+              ${joinURL}
+            </div>`;
+        }
+      }
+    };
     setTimeout(tryQR, 80);
   });
 }
@@ -944,11 +976,33 @@ function htmlQuestion() {
 }
 
 function bindQuestion() {
-  document.getElementById('reveal-btn').addEventListener('click', () => {
-    stopCountdown();
-    send({ type: 'next' });
-    // Show a brief loading state; onMessage('reveal') will call setPhase('reveal').
-    app.innerHTML = `<div style="height:100vh;background:${C.dark};display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-family:Lato,sans-serif;font-size:18px;font-weight:700;letter-spacing:1px">Calculating scores…</div>`;
+  const revealBtn = document.getElementById('reveal-btn');
+  let confirmArmed = false;
+  let confirmTimer = null;
+
+  revealBtn.addEventListener('click', () => {
+    if (!confirmArmed) {
+      // First click — arm the confirm state for 3 s
+      confirmArmed = true;
+      revealBtn.textContent = '⚠ Click again to reveal';
+      revealBtn.style.background = C.red;
+      revealBtn.style.border = `2px solid ${C.red}`;
+      revealBtn.style.color = '#fff';
+      confirmTimer = setTimeout(() => {
+        confirmArmed = false;
+        revealBtn.textContent = 'Reveal answers →';
+        revealBtn.style.background = 'rgba(255,255,255,0.08)';
+        revealBtn.style.border = '2px solid rgba(255,255,255,0.3)';
+        revealBtn.style.color = '#fff';
+        confirmTimer = null;
+      }, 3000);
+    } else {
+      // Second click — confirmed
+      clearTimeout(confirmTimer);
+      stopCountdown();
+      send({ type: 'next' });
+      app.innerHTML = `<div style="height:100vh;background:${C.dark};display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-family:Lato,sans-serif;font-size:18px;font-weight:700;letter-spacing:1px">Calculating scores…</div>`;
+    }
   });
 }
 
@@ -1199,10 +1253,32 @@ function bindFinal() {
 }
 
 function downloadCSV() {
-  const rows = [['Rank', 'Name', 'Score']];
-  S.leaderboard.forEach(p => rows.push([p.rank, p.name, p.score]));
-  const csv  = rows.map(r => r.join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
+  const qCount  = S.questionCorrects.length || S.questions.length;
+  const corrects = S.questionCorrects; // may be empty if old server version
+
+  // Build header row: Rank, Name, Score, Q1, Q2, …
+  const headers = ['Rank', 'Name', 'Score'];
+  for (let i = 0; i < qCount; i++) headers.push(`Q${i + 1}`);
+
+  const rows = [headers];
+  S.leaderboard.forEach(p => {
+    const row      = [p.rank, p.name, p.score];
+    const pAnswers = S.playerAnswers[p.name] || {};
+    for (let i = 0; i < qCount; i++) {
+      if (!(i in pAnswers)) {
+        row.push('–');           // player didn't answer this question
+      } else if (corrects.length > i) {
+        row.push(pAnswers[i] === corrects[i] ? '✓' : '✗');
+      } else {
+        row.push(pAnswers[i]);   // fallback: just the raw answer index
+      }
+    }
+    rows.push(row);
+  });
+
+  // Wrap each cell in quotes so commas/special chars are safe
+  const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }); // BOM for Excel
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
   a.download = `wmg-quiz-${S.room}-results.csv`;

@@ -7,6 +7,7 @@ interface Player {
   score: number;
   joinedAt: number;
   token: string;
+  answers: Record<number, number>; // questionIndex → chosen answer index
 }
 
 interface Answer {
@@ -97,7 +98,7 @@ export default class QuizServer implements Party.Server {
       name = `${name}_${n}`;
     }
 
-    this.players.set(name, { name, score: 0, joinedAt: Date.now(), token });
+    this.players.set(name, { name, score: 0, joinedAt: Date.now(), token, answers: {} });
     this.conns.set(conn.id, name);
 
     // Tell this player their (possibly adjusted) nickname
@@ -171,6 +172,10 @@ export default class QuizServer implements Party.Server {
     if (!Number.isInteger(idx) || idx < 0 || idx > 3) return;
 
     this.answers.set(name, { answerIndex: idx, answeredAt: Date.now() });
+
+    // Log answer in the player's permanent record (for CSV export)
+    const player = this.players.get(name);
+    if (player) player.answers[this.currentQ] = idx;
 
     // Confirm to this player only (they go to locked state)
     conn.send(JSON.stringify({ type: "answer_received", answerIndex: idx }));
@@ -289,9 +294,16 @@ export default class QuizServer implements Party.Server {
   }
 
   broadcastGameOver() {
+    // Build per-player answer log for host CSV export
+    const playerAnswers: Record<string, Record<number, number>> = {};
+    for (const [name, player] of this.players) {
+      playerAnswers[name] = player.answers;
+    }
     this.room.broadcast(JSON.stringify({
-      type:        "game_over",
-      leaderboard: this.getLeaderboard(),
+      type:          "game_over",
+      leaderboard:   this.getLeaderboard(),
+      playerAnswers,
+      questions:     this.questions.map(q => ({ correct: q.correct })),
     }));
   }
 

@@ -66,6 +66,7 @@ function connect() {
   ws = new WebSocket(url);
 
   ws.addEventListener('open', () => {
+    hideReconnectBanner();
     const stored = getSession(S.room);
     if (stored && stored.nickname === S.nickname && stored.token === S.token) {
       send({ type: 'rejoin', nickname: S.nickname, token: S.token });
@@ -79,8 +80,8 @@ function connect() {
   });
 
   ws.addEventListener('close', () => {
-    // Auto-reconnect after 2 s if we have a session
     if (S.phase !== 'join') {
+      showReconnectBanner();
       reconnectTimeout = setTimeout(connect, 2000);
     }
   });
@@ -92,6 +93,83 @@ function send(msg) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(msg));
   }
+}
+
+// ── Player audio engine ────────────────────────────────────────────────────
+// Minimal Web Audio API synth — same pattern as host.js, no external deps.
+
+let _pActx = null;
+let _warned5s = false;
+
+function _pGetCtx() {
+  if (!_pActx) {
+    try { _pActx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+  }
+  if (_pActx.state === 'suspended') _pActx.resume().catch(() => {});
+  return _pActx;
+}
+
+// Play a sequence of [freq, beats] once. freq=0 → rest.
+function _pOnce(seq, bpm, wave, vol) {
+  const ctx = _pGetCtx(); if (!ctx) return;
+  const beat = 60 / bpm;
+  let t = ctx.currentTime + 0.04;
+  seq.forEach(([f, b]) => {
+    const dur = b * beat;
+    if (f) {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      const att = Math.min(0.015, dur * 0.1);
+      const rel = Math.min(0.1, dur * 0.4);
+      osc.type = wave;
+      osc.frequency.value = f;
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(vol, t + att);
+      env.gain.setValueAtTime(vol, t + dur - rel);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.005);
+      osc.connect(env); env.connect(ctx.destination);
+      osc.start(t); osc.stop(t + dur);
+    }
+    t += dur;
+  });
+}
+
+// Sound effects
+function playAnswerLock() { _pOnce([[784, 0.07]], 240, 'sine', 0.20); }         // G5 bip
+function playCorrect()    { _pOnce([[523.3, 0.18],[659.3, 0.18],[784, 0.32]], 210, 'triangle', 0.18); } // C5-E5-G5
+function playWrong()      { _pOnce([[220, 0.28]], 120, 'sawtooth', 0.12); }     // A3 thud
+function play5sWarning()  { _pOnce([[784, 0.12],[698.5, 0.12],[523.3, 0.22]], 220, 'triangle', 0.13); } // G5-F5-C5 descending
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+
+// Reconnect banner — shown when WebSocket drops, removed on restore.
+function showReconnectBanner() {
+  if (document.getElementById('reconnect-banner')) return;
+  const el = document.createElement('div');
+  el.id = 'reconnect-banner';
+  el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;padding:10px 16px;' +
+    'background:rgba(0,0,0,0.88);color:#fff;font-family:Lato,sans-serif;' +
+    'font-size:12px;font-weight:800;text-align:center;letter-spacing:1.5px;' +
+    'text-transform:uppercase;z-index:9999';
+  el.textContent = '↻ Reconnecting…';
+  document.body.appendChild(el);
+}
+
+function hideReconnectBanner() {
+  document.getElementById('reconnect-banner')?.remove();
+}
+
+// "GO!" flash — shown when the host starts the timer, then fades out.
+function showGoFlash(cb) {
+  const flash = document.createElement('div');
+  flash.style.cssText = 'position:fixed;inset:0;background:' + C.orange +
+    ';display:flex;align-items:center;justify-content:center;z-index:9990;pointer-events:none;transition:opacity 0.2s';
+  flash.innerHTML = '<div style="font-family:Lato,sans-serif;font-size:110px;font-weight:900;color:#fff;letter-spacing:-4px;line-height:1">GO!</div>';
+  document.body.appendChild(flash);
+  setTimeout(() => {
+    flash.style.opacity = '0';
+    setTimeout(() => { flash.remove(); cb(); }, 200);
+  }, 480);
 }
 
 // ── Message handlers ───────────────────────────────────────────────────────
@@ -119,9 +197,10 @@ function onMessage(msg) {
       break;
 
     case 'pre_question':
-      S.currentQ = msg.question;
-      S.qIndex   = msg.index + 1;
-      S.qTotal   = msg.total;
+      S.currentQ    = msg.question;
+      S.qIndex      = msg.index + 1;
+      S.qTotal      = msg.total;
+      S.chosenAnswer = null; // reset from previous round
       stopTimer();
       // Save current leaderboard position before new round
       S.preLB = S.leaderboard.slice();
@@ -129,16 +208,16 @@ function onMessage(msg) {
       break;
 
     case 'timer_started':
-      S.currentQ    = msg.question;
-      S.qIndex      = msg.index + 1;
-      S.qTotal      = msg.total;
+      S.currentQ      = msg.question;
+      S.qIndex        = msg.index + 1;
+      S.qTotal        = msg.total;
       S.questionStart = msg.questionStartTime;
-      // Re-joining mid-question
-      if (msg.type === 'answer_received_late') {
-        S.chosenAnswer  = msg.answerIndex;
-        S.answeredCount = msg.answerCount || 0;
-        S.totalPlayers  = msg.playerCount || 0;
-        setPhase('locked');
+      // Flash "GO!" then switch to question (mid-question rejoin skips the flash)
+      if (S.phase === 'pre_question') {
+        showGoFlash(() => {
+          setPhase('question');
+          startTimer(msg.questionStartTime, S.currentQ.time);
+        });
       } else {
         setPhase('question');
         startTimer(msg.questionStartTime, S.currentQ.time);
@@ -214,6 +293,7 @@ function onMessage(msg) {
 // ── Timer ──────────────────────────────────────────────────────────────────
 function startTimer(startTime, durationSecs) {
   stopTimer();
+  _warned5s = false;
   const endTime = startTime + durationSecs * 1000;
 
   function tick() {
@@ -227,6 +307,7 @@ function startTimer(startTime, durationSecs) {
 
     if (remaining <= 5) {
       if (txt) txt.style.color = C.red;
+      if (!_warned5s) { _warned5s = true; play5sWarning(); }
     }
 
     if (remaining <= 0) {
@@ -263,7 +344,7 @@ function renderScreen() {
     case 'pre_question': app.innerHTML = htmlPreQuestion();                      break;
     case 'question':     app.innerHTML = htmlQuestion();     bindQuestion();      break;
     case 'locked':       app.innerHTML = htmlLocked();                           break;
-    case 'reveal':       app.innerHTML = htmlReveal();                           break;
+    case 'reveal':       app.innerHTML = htmlReveal();  bindReveal();            break;
     case 'final':        app.innerHTML = htmlFinal();        bindFinal();         break;
   }
 }
@@ -377,6 +458,9 @@ function bindJoin() {
     S.room     = room;
     S.token    = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
+    // Pre-create AudioContext while we have a user gesture so sounds work later
+    _pGetCtx();
+
     // Optimistic waiting screen while connecting
     setPhase('waiting');
     connect();
@@ -434,6 +518,7 @@ function htmlWaiting() {
 function htmlPreQuestion() {
   const q = S.currentQ;
   return `
+<style>@keyframes pqPulse{0%,100%{opacity:0.45}50%{opacity:1}}</style>
 <div style="height:100dvh;background:${C.dark};color:#fff;font-family:Lato,sans-serif;display:flex;flex-direction:column;overflow:hidden">
 
   <!-- Progress bar -->
@@ -458,8 +543,12 @@ function htmlPreQuestion() {
       </div>`).join('')}
   </div>
 
-  <div style="padding:0 22px 16px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.4);text-transform:uppercase;text-align:center">
-    Timer starts when tutor is ready
+  <!-- Pulsing "get ready" indicator -->
+  <div style="padding:0 22px 20px;text-align:center">
+    <div style="display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:800;letter-spacing:1px;
+                color:${C.orange};animation:pqPulse 1.4s ease-in-out infinite">
+      <span>⏳</span> Get ready…
+    </div>
   </div>
 </div>`;
 }
@@ -508,6 +597,7 @@ function bindQuestion() {
     btn.addEventListener('click', () => {
       if (S.phase !== 'question') return;
       const idx = parseInt(btn.dataset.answer, 10);
+      playAnswerLock();
       send({ type: 'answer', answerIndex: idx });
       // Optimistic locked state
       S.chosenAnswer = idx;
@@ -551,6 +641,11 @@ function htmlLocked() {
     </div>
   </div>
 </div>`;
+}
+
+function bindReveal() {
+  const wasCorrect = S.chosenAnswer === S.correct;
+  if (wasCorrect) playCorrect(); else playWrong();
 }
 
 function htmlReveal() {
