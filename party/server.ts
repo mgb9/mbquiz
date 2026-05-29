@@ -1,4 +1,6 @@
 import type * as Party from "partykit/server";
+import { scoreAnswer } from "../src/scoring.js";
+import { validateQuestions } from "../src/validation.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,42 @@ interface Question {
 
 type Phase = "lobby" | "question" | "reveal" | "leaderboard" | "end";
 
+// ── Wire protocol ───────────────────────────────────────────────────────────
+// Inbound messages from clients. Typed as a discriminated union so each handler
+// gets a narrowed shape and the client/server contract can't silently drift.
+
+interface JoinMsg       { type: "join";        nickname?: unknown; token?: unknown; }
+interface RejoinMsg     { type: "rejoin";      nickname?: unknown; token?: unknown; }
+interface StartMsg      { type: "start";       hostToken?: unknown; questions?: unknown; title?: unknown; defaultTime?: unknown; flatScoring?: unknown; }
+interface BeginTimerMsg { type: "begin_timer"; hostToken?: unknown; }
+interface AnswerMsg     { type: "answer";      answerIndex?: unknown; }
+interface NextMsg       { type: "next";        hostToken?: unknown; }
+interface EndMsg        { type: "end";         hostToken?: unknown; }
+
+type ClientMessage =
+  | JoinMsg | RejoinMsg | StartMsg | BeginTimerMsg | AnswerMsg | NextMsg | EndMsg;
+
+// Messages that drive the game forward — only the host may send them.
+type HostMessage = StartMsg | BeginTimerMsg | NextMsg | EndMsg;
+
+// ── Persistence ─────────────────────────────────────────────────────────────
+// Snapshot shape written to room storage. `conns` is intentionally excluded —
+// connection IDs are meaningless after a restart; clients re-register on reconnect.
+
+interface Snapshot {
+  players:           [string, Player][];
+  questions:         Question[];
+  quizTitle:         string;
+  defaultTime:       number;
+  flatScoring:       boolean;
+  phase:             Phase;
+  currentQ:          number;
+  questionStartTime: number;
+  timerStarted:      boolean;
+  answers:           [string, Answer][];
+  hostToken:         string;
+}
+
 // ── Server ────────────────────────────────────────────────────────────────────
 
 export default class QuizServer implements Party.Server {
@@ -42,7 +80,52 @@ export default class QuizServer implements Party.Server {
   timerStarted:     boolean = false;
   answers = new Map<string, Answer>(); // nickname → Answer
 
+  // Secret minted by the host client at game creation. The first `start` claims
+  // it; thereafter only messages carrying the matching token may drive the game.
+  hostToken:        string  = "";
+
   constructor(readonly room: Party.Room) {}
+
+  // ── Persistence ───────────────────────────────────────────────────────────
+
+  // Rehydrate an in-progress game after a room restart / eviction.
+  async onStart() {
+    const snap = await this.room.storage.get<Snapshot>("state");
+    if (!snap) return;
+    this.players           = new Map(snap.players);
+    this.questions         = snap.questions;
+    this.quizTitle         = snap.quizTitle;
+    this.defaultTime       = snap.defaultTime;
+    this.flatScoring       = snap.flatScoring;
+    this.phase             = snap.phase;
+    this.currentQ          = snap.currentQ;
+    this.questionStartTime = snap.questionStartTime;
+    this.timerStarted      = snap.timerStarted;
+    this.answers           = new Map(snap.answers);
+    this.hostToken         = snap.hostToken;
+  }
+
+  // Fire-and-forget snapshot; callers don't await so broadcasts stay snappy.
+  persist() {
+    if (this.phase === "end") {
+      void this.room.storage.delete("state");
+      return;
+    }
+    const snap: Snapshot = {
+      players:           Array.from(this.players.entries()),
+      questions:         this.questions,
+      quizTitle:         this.quizTitle,
+      defaultTime:       this.defaultTime,
+      flatScoring:       this.flatScoring,
+      phase:             this.phase,
+      currentQ:          this.currentQ,
+      questionStartTime: this.questionStartTime,
+      timerStarted:      this.timerStarted,
+      answers:           Array.from(this.answers.entries()),
+      hostToken:         this.hostToken,
+    };
+    void this.room.storage.put("state", snap);
+  }
 
   // ── Connection lifecycle ─────────────────────────────────────────────────
 
@@ -65,8 +148,12 @@ export default class QuizServer implements Party.Server {
   // ── Message routing ──────────────────────────────────────────────────────
 
   onMessage(raw: string, sender: Party.Connection) {
-    let msg: any;
-    try { msg = JSON.parse(raw); } catch { return; }
+    let msg: ClientMessage;
+    try { msg = JSON.parse(raw) as ClientMessage; } catch { return; }
+    if (!msg || typeof msg.type !== "string") return;
+
+    // Gate game-control messages behind host authorization.
+    if (this.isHostMessage(msg) && !this.authorizeHost(msg, sender)) return;
 
     switch (msg.type) {
       case "join":        this.handleJoin(msg, sender);        break;
@@ -79,9 +166,37 @@ export default class QuizServer implements Party.Server {
     }
   }
 
+  // ── Authorization ──────────────────────────────────────────────────────────
+
+  isHostMessage(msg: ClientMessage): msg is HostMessage {
+    return msg.type === "start" || msg.type === "begin_timer"
+        || msg.type === "next"  || msg.type === "end";
+  }
+
+  /**
+   * Returns true if this control message may proceed. The first `start` claims
+   * the room's hostToken; from then on every control message must present it.
+   * A `start` arriving after the token is claimed is rejected unless it matches.
+   */
+  authorizeHost(msg: HostMessage, conn: Party.Connection): boolean {
+    const supplied = String(msg.hostToken ?? "").trim();
+
+    // First `start` with a token claims the room.
+    if (!this.hostToken) {
+      if (msg.type === "start" && supplied) return true;
+      // No host claimed yet and this isn't a claiming start — ignore.
+      return false;
+    }
+
+    if (supplied === this.hostToken) return true;
+
+    conn.send(JSON.stringify({ type: "error", reason: "not_host" }));
+    return false;
+  }
+
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  handleJoin(msg: any, conn: Party.Connection) {
+  handleJoin(msg: JoinMsg, conn: Party.Connection) {
     if (this.phase === "end") {
       conn.send(JSON.stringify({ type: "error", reason: "game_over" }));
       return;
@@ -109,9 +224,10 @@ export default class QuizServer implements Party.Server {
 
     // Everyone gets the updated player list
     this.broadcastPlayerList();
+    this.persist();
   }
 
-  handleRejoin(msg: any, conn: Party.Connection) {
+  handleRejoin(msg: RejoinMsg, conn: Party.Connection) {
     const name  = String(msg.nickname ?? "").trim();
     const token = String(msg.token   ?? "").trim();
     const player = this.players.get(name);
@@ -130,11 +246,18 @@ export default class QuizServer implements Party.Server {
     }
   }
 
-  handleStart(msg: any, _conn: Party.Connection) {
+  handleStart(msg: StartMsg, conn: Party.Connection) {
     if (this.phase !== "lobby") return;
-    if (!Array.isArray(msg.questions) || msg.questions.length === 0) return;
 
-    this.questions    = msg.questions;
+    const questions = validateQuestions(msg.questions);
+    if (!questions) {
+      conn.send(JSON.stringify({ type: "error", reason: "bad_quiz" }));
+      return;
+    }
+
+    // Claim host ownership of the room (authorizeHost already verified a token).
+    this.hostToken    = String(msg.hostToken ?? "").trim();
+    this.questions    = questions;
     this.quizTitle    = String(msg.title ?? "WMG Quiz");
     this.defaultTime  = Number(msg.defaultTime) || 30;
     this.flatScoring  = !!msg.flatScoring;
@@ -144,6 +267,7 @@ export default class QuizServer implements Party.Server {
     this.answers.clear();
 
     this.broadcastPreQuestion();
+    this.persist();
   }
 
   handleBeginTimer(_conn: Party.Connection) {
@@ -160,16 +284,17 @@ export default class QuizServer implements Party.Server {
       question:          { q: q.q, answers: q.answers, time: q.time ?? this.defaultTime },
       questionStartTime: this.questionStartTime,
     }));
+    this.persist();
   }
 
-  handleAnswer(msg: any, conn: Party.Connection) {
+  handleAnswer(msg: AnswerMsg, conn: Party.Connection) {
     if (this.phase !== "question" || !this.timerStarted) return;
 
     const name = this.conns.get(conn.id);
     if (!name || this.answers.has(name)) return;
 
     const idx = Number(msg.answerIndex);
-    const maxIdx = (this.questions[this.currentQ]?.answers?.length ?? 4) - 1;
+    const maxIdx = this.questions[this.currentQ].answers.length - 1;
     if (!Number.isInteger(idx) || idx < 0 || idx > maxIdx) return;
 
     this.answers.set(name, { answerIndex: idx, answeredAt: Date.now() });
@@ -187,6 +312,7 @@ export default class QuizServer implements Party.Server {
       count: this.answers.size,
       total: this.players.size,
     }));
+    this.persist();
   }
 
   handleNext(_conn: Party.Connection) {
@@ -220,30 +346,31 @@ export default class QuizServer implements Party.Server {
         this.broadcastPreQuestion();
       }
     }
+    this.persist();
   }
 
   handleEnd() {
     this.phase = "end";
     this.broadcastGameOver();
+    this.persist();
   }
 
   // ── Score calculation ─────────────────────────────────────────────────────
 
   calculateScores() {
-    const q         = this.questions[this.currentQ];
-    const timeLimitMs = (q.time ?? this.defaultTime) * 1000;
+    const q            = this.questions[this.currentQ];
+    const timeLimitSecs = q.time ?? this.defaultTime;
 
     for (const [name, answer] of this.answers) {
       const player = this.players.get(name);
-      if (!player || answer.answerIndex !== q.correct) continue;
-
-      if (this.flatScoring) {
-        player.score += 1000;
-      } else {
-        const elapsed   = Math.max(0, answer.answeredAt - this.questionStartTime);
-        const fraction  = Math.min(1, elapsed / timeLimitMs);
-        player.score   += Math.round(1000 * (1 - fraction / 2));
-      }
+      if (!player) continue;
+      player.score += scoreAnswer({
+        correct:       answer.answerIndex === q.correct,
+        flat:          this.flatScoring,
+        answeredAt:    answer.answeredAt,
+        questionStart: this.questionStartTime,
+        timeLimitSecs,
+      });
     }
   }
 
@@ -260,27 +387,22 @@ export default class QuizServer implements Party.Server {
   }
 
   broadcastReveal() {
-    const q          = this.questions[this.currentQ];
-    const timeLimitMs = (q.time ?? this.defaultTime) * 1000;
-    const counts      = Array(q.answers.length).fill(0);
+    const q            = this.questions[this.currentQ];
+    const timeLimitSecs = q.time ?? this.defaultTime;
+    const counts       = Array(q.answers.length).fill(0);
     const roundScores: Record<string, number> = {};
     const chosen:      Record<string, number> = {};
 
     for (const [name, answer] of this.answers) {
       counts[answer.answerIndex]++;
       chosen[name] = answer.answerIndex;
-
-      if (answer.answerIndex === q.correct) {
-        if (this.flatScoring) {
-          roundScores[name] = 1000;
-        } else {
-          const elapsed   = Math.max(0, answer.answeredAt - this.questionStartTime);
-          const fraction  = Math.min(1, elapsed / timeLimitMs);
-          roundScores[name] = Math.round(1000 * (1 - fraction / 2));
-        }
-      } else {
-        roundScores[name] = 0;
-      }
+      roundScores[name] = scoreAnswer({
+        correct:       answer.answerIndex === q.correct,
+        flat:          this.flatScoring,
+        answeredAt:    answer.answeredAt,
+        questionStart: this.questionStartTime,
+        timeLimitSecs,
+      });
     }
 
     this.room.broadcast(JSON.stringify({
@@ -360,18 +482,18 @@ export default class QuizServer implements Party.Server {
       const counts      = Array(q.answers.length).fill(0);
       const roundScores: Record<string, number> = {};
       const chosen:      Record<string, number> = {};
-      const timeLimitMs = (q.time ?? this.defaultTime) * 1000;
+      const timeLimitSecs = q.time ?? this.defaultTime;
 
       for (const [name, answer] of this.answers) {
         counts[answer.answerIndex]++;
         chosen[name] = answer.answerIndex;
-        if (answer.answerIndex === q.correct) {
-          const elapsed  = Math.max(0, answer.answeredAt - this.questionStartTime);
-          const fraction = Math.min(1, elapsed / timeLimitMs);
-          roundScores[name] = this.flatScoring ? 1000 : Math.round(1000 * (1 - fraction / 2));
-        } else {
-          roundScores[name] = 0;
-        }
+        roundScores[name] = scoreAnswer({
+          correct:       answer.answerIndex === q.correct,
+          flat:          this.flatScoring,
+          answeredAt:    answer.answeredAt,
+          questionStart: this.questionStartTime,
+          timeLimitSecs,
+        });
       }
       conn.send(JSON.stringify({
         type:        "reveal",
