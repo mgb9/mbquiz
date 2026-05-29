@@ -9,6 +9,7 @@
 
 import { PARTYKIT_HOST } from './config.js';
 import { C, TILES, escHtml, shapeSVG } from './shared.js';
+import { scheduleTone } from './audio.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
@@ -135,21 +136,8 @@ function _sched(seq, bpm, wave, vol, t0) {
   let t = t0;
   seq.forEach(([f, b]) => {
     const dur = b * beat;
-    if (f) {
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      const att = Math.min(0.02, dur * 0.12);
-      const rel = Math.min(0.12, dur * 0.4);
-      osc.type = wave;
-      osc.frequency.value = f;
-      env.gain.setValueAtTime(0, t);
-      env.gain.linearRampToValueAtTime(vol, t + att);
-      env.gain.setValueAtTime(vol, t + dur - rel);
-      env.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.005);
-      osc.connect(env); env.connect(_mGain);
-      osc.start(t); osc.stop(t + dur);
-      _anodes.push(osc);
-    }
+    const osc = scheduleTone(ctx, _mGain, { freq: f, at: t, dur, wave, vol, attCap: 0.02, attMul: 0.12, relCap: 0.12 });
+    if (osc) _anodes.push(osc);
     t += dur;
   });
   return t;

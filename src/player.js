@@ -10,6 +10,7 @@
 
 import { PARTYKIT_HOST } from './config.js';
 import { C, TILES, escHtml, shapeSVG } from './shared.js';
+import { scheduleTone } from './audio.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
@@ -96,20 +97,7 @@ function _pOnce(seq, bpm, wave, vol) {
   let t = ctx.currentTime + 0.04;
   seq.forEach(([f, b]) => {
     const dur = b * beat;
-    if (f) {
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      const att = Math.min(0.015, dur * 0.1);
-      const rel = Math.min(0.1, dur * 0.4);
-      osc.type = wave;
-      osc.frequency.value = f;
-      env.gain.setValueAtTime(0, t);
-      env.gain.linearRampToValueAtTime(vol, t + att);
-      env.gain.setValueAtTime(vol, t + dur - rel);
-      env.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.005);
-      osc.connect(env); env.connect(ctx.destination);
-      osc.start(t); osc.stop(t + dur);
-    }
+    scheduleTone(ctx, ctx.destination, { freq: f, at: t, dur, wave, vol, attCap: 0.015, attMul: 0.1, relCap: 0.1 });
     t += dur;
   });
 }
