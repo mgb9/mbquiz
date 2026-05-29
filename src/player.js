@@ -9,27 +9,7 @@
  */
 
 import { PARTYKIT_HOST } from './config.js';
-
-// ── Design tokens ──────────────────────────────────────────────────────────
-const C = {
-  red:         '#EE3124',
-  blue:        '#009DDC',
-  gold:        '#FBB034',
-  lime:        '#C1D82F',
-  orange:      '#F47920',
-  dark:        '#211F25',
-  grey:        '#6D6E71',
-  chalk:       '#FAFAF8',
-  ink:         '#1A1820',
-  inkSoft:     '#3A3641',
-};
-
-const TILES = [
-  { letter: 'A', color: C.red,    shape: 'triangle', name: 'Red Triangle'  },
-  { letter: 'B', color: C.blue,   shape: 'diamond',  name: 'Blue Diamond'  },
-  { letter: 'C', color: C.gold,   shape: 'circle',   name: 'Gold Circle'   },
-  { letter: 'D', color: C.lime,   shape: 'square',   name: 'Lime Square'   },
-];
+import { C, TILES, escHtml, shapeSVG } from './shared.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
@@ -347,15 +327,6 @@ function renderScreen() {
     case 'reveal':       app.innerHTML = htmlReveal();  bindReveal();            break;
     case 'final':        app.innerHTML = htmlFinal();        bindFinal();         break;
   }
-}
-
-// ── SVG shapes ─────────────────────────────────────────────────────────────
-function shapeSVG(shape, size, color) {
-  const props = `fill="${color}"`;
-  if (shape === 'triangle') return `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><polygon points="20,3 38,37 2,37" ${props}/></svg>`;
-  if (shape === 'diamond')  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><polygon points="20,2 38,20 20,38 2,20" ${props}/></svg>`;
-  if (shape === 'circle')   return `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" ${props}/></svg>`;
-  /* square */               return `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><rect x="3" y="3" width="34" height="34" rx="2" ${props}/></svg>`;
 }
 
 // WMG Quiz lockup (compact)
@@ -865,10 +836,6 @@ function clearSession(room) {
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
-function escHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
 function findRank(lb, name) {
   const entry = lb.find(p => p.name === name);
   return entry ? entry.rank : 0;

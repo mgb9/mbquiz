@@ -8,32 +8,13 @@
  */
 
 import { PARTYKIT_HOST } from './config.js';
-
-// ── Design tokens ──────────────────────────────────────────────────────────
-const C = {
-  red:     '#EE3124',
-  blue:    '#009DDC',
-  gold:    '#FBB034',
-  lime:    '#C1D82F',
-  orange:  '#F47920',
-  dark:    '#211F25',
-  grey:    '#6D6E71',
-  chalk:   '#FAFAF8',
-  ink:     '#1A1820',
-  inkSoft: '#3A3641',
-};
-
-const TILES = [
-  { letter: 'A', color: C.red,    shape: 'triangle' },
-  { letter: 'B', color: C.blue,   shape: 'diamond'  },
-  { letter: 'C', color: C.gold,   shape: 'circle'   },
-  { letter: 'D', color: C.lime,   shape: 'square'   },
-];
+import { C, TILES, escHtml, shapeSVG } from './shared.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
   phase:         'setup',  // setup|lobby|pre_question|question|reveal|leaderboard|final
   room:          '',
+  hostToken:     '',      // secret proving this client owns the game (server-enforced)
   questions:     [],
   quizTitle:     '',
   defaultTime:   30,
@@ -79,7 +60,32 @@ function connect(room) {
 }
 
 function send(msg) {
+  // Every message the host sends is a game-control message, so stamp the host
+  // token on all of them — the server rejects control messages without it.
+  if (S.hostToken) msg = { ...msg, hostToken: S.hostToken };
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+}
+
+// ── Host session ─────────────────────────────────────────────────────────────
+// A random secret minted per game and persisted so a host who reloads (or whose
+// socket drops) keeps control of the same room.
+const HOST_SESSION_KEY = 'wmg-quiz-host';
+
+function ensureHostToken(room) {
+  try {
+    const sessions = JSON.parse(localStorage.getItem(HOST_SESSION_KEY) || '{}');
+    const existing = sessions[room];
+    if (existing && Date.now() - existing.savedAt < 4 * 60 * 60 * 1000) {
+      return existing.token;
+    }
+    const token = (crypto.randomUUID?.() ?? String(Math.random()).slice(2) + String(Math.random()).slice(2));
+    sessions[room] = { token, savedAt: Date.now() };
+    localStorage.setItem(HOST_SESSION_KEY, JSON.stringify(sessions));
+    return token;
+  } catch {
+    // localStorage unavailable — fall back to an in-memory-only token.
+    return (crypto.randomUUID?.() ?? String(Math.random()).slice(2) + String(Math.random()).slice(2));
+  }
 }
 
 // ── Audio ──────────────────────────────────────────────────────────────────
@@ -416,15 +422,6 @@ function updateLobbyPlayerList() {
     </div>`).join('');
 }
 
-// ── SVG shapes ─────────────────────────────────────────────────────────────
-function shapeSVG(shape, size, color) {
-  const p = `fill="${color}"`;
-  if (shape === 'triangle') return `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><polygon points="20,3 38,37 2,37" ${p}/></svg>`;
-  if (shape === 'diamond')  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><polygon points="20,2 38,20 20,38 2,20" ${p}/></svg>`;
-  if (shape === 'circle')   return `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" ${p}/></svg>`;
-  return                           `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><rect x="3" y="3" width="34" height="34" rx="2" ${p}/></svg>`;
-}
-
 // Shared WMG lockup
 const MARK_DARK = `
   <div style="display:inline-flex;align-items:center;gap:10px">
@@ -719,6 +716,7 @@ function bindSetup() {
     if (!room) { errorEl.textContent = 'Please enter a valid room name.'; errorEl.style.display = 'block'; return; }
 
     S.room        = room;
+    S.hostToken   = ensureHostToken(room);
     S.questions   = parsedData.questions;
     S.quizTitle   = parsedData.title || 'WMG Quiz';
     S.defaultTime = defaultSecs; // UI selection always wins over JSON's defaultTime
@@ -1331,10 +1329,6 @@ function randomRoom() {
   const a = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
   const b = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
   return `${a}-${b}`;
-}
-
-function escHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
