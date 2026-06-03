@@ -448,20 +448,26 @@ const ACCENT_LINE = `<svg width="88" height="10" viewBox="0 0 88 10" style="disp
 const SECTOR_BAR = `<div style="position:absolute;top:0;right:0;height:6px;width:40%;background:${C.orange}"></div>`;
 
 // Mini game header bar
-function miniHeader(dark = true) {
+// `rightBadge` is optional markup shown to the left of the question count, in
+// the header flow — use it for per-screen phase badges so they never overlap
+// the count (which previously happened with absolutely-positioned badges).
+function miniHeader(dark = true, rightBadge = '') {
   const subdued = dark ? 'rgba(255,255,255,0.5)' : C.grey;
   const fg      = dark ? '#fff' : C.ink;
   return `
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
-    <div style="display:flex;align-items:center;gap:18px">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:28px">
+    <div style="display:flex;align-items:center;gap:18px;min-width:0">
       ${dark ? MARK_DARK : MARK_LIGHT}
-      <div style="width:1px;height:26px;background:${subdued}"></div>
-      <div style="font-weight:700;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:${subdued}">
+      <div style="width:1px;height:26px;background:${subdued};flex-shrink:0"></div>
+      <div style="font-weight:700;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:${subdued};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         ${escHtml(S.quizTitle)}
       </div>
     </div>
-    <div style="font-weight:800;font-size:14px;color:${subdued};letter-spacing:1.5px;text-transform:uppercase;font-variant-numeric:tabular-nums">
-      Question ${S.qIndex} / ${S.qTotal}
+    <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
+      ${rightBadge}
+      <div style="font-weight:800;font-size:14px;color:${subdued};letter-spacing:1.5px;text-transform:uppercase;font-variant-numeric:tabular-nums;white-space:nowrap">
+        Question ${S.qIndex} / ${S.qTotal}
+      </div>
     </div>
   </div>`;
 }
@@ -860,15 +866,11 @@ function htmlPreQuestion() {
   return `
 <div style="height:100vh;background:${C.dark};color:#fff;font-family:Lato,sans-serif;padding:48px 56px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:hidden">
   ${SECTOR_BAR}
-  ${miniHeader(true)}
-
-  <!-- Phase badge -->
-  <div style="position:absolute;top:48px;right:56px">
+  ${miniHeader(true, `
     <div style="background:rgba(255,255,255,0.08);padding:6px 14px;font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:${C.orange};display:flex;align-items:center;gap:8px">
       <span style="width:8px;height:8px;background:${C.orange};border-radius:50%;display:inline-block"></span>
       Read time
-    </div>
-  </div>
+    </div>`)}
 
   <!-- Question centred -->
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:32px">
@@ -1040,12 +1042,7 @@ function htmlReveal() {
   return `
 <div style="height:100vh;background:${C.dark};color:#fff;font-family:Lato,sans-serif;padding:44px 52px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:hidden">
   ${SECTOR_BAR}
-  ${miniHeader(true)}
-
-  <!-- Phase badge -->
-  <div style="position:absolute;top:44px;right:52px">
-    <div style="background:${C.lime};color:${C.dark};padding:6px 14px;font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase">✓ Answer revealed</div>
-  </div>
+  ${miniHeader(true, `<div style="background:${C.lime};color:${C.dark};padding:6px 14px;font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase">✓ Answer revealed</div>`)}
 
   <!-- Question -->
   <div style="margin-bottom:20px">
