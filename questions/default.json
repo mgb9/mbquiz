@@ -4,82 +4,92 @@
     {
       "q": "When are assessments due to be submitted to AQ for the 26/27 assessment approval cycle?",
       "answers": [
-        "Friday 26th June 2026",
         "Friday 18th September 2026",
+        "Friday 26th June 2026",
         "Monday 1st June 2026",
         "Friday 19th September 2025"
       ],
-      "correct": 0
+      "correct": 1
     },
     {
       "q": "What must assessment rubrics contain to support faster and easier feedback?",
       "answers": [
         "A single generic mark band description used across all modules",
-        "Learning outcome-specific wording, adapting the standard wording as appropriate",
         "Marks allocated separately for presentation, spelling, punctuation and grammar",
-        "The staff-facing marking guidance copied into each row"
+        "The staff-facing marking guidance copied into each row",
+        "Learning outcome-specific wording, adapting the standard wording as appropriate"
       ],
-      "correct": 1
+      "correct": 3
     },
     {
-      "q": "True or false: an assessment can stay the same from one academic year to the next.",
+      "q": "Can an assessment stay the same from one academic year to the next?",
       "answers": [
-        "True — provided the learning outcomes have not changed",
-        "True — provided the external examiner approves no change",
-        "False — assessments must be substantially different to last year and changed every academic year",
-        "False — but only the resit assessment needs to change"
+        "No — assessments must be substantially different to last year and changed every academic year",
+        "Yes — provided the learning outcomes have not changed",
+        "Yes — provided the external examiner approves no change",
+        "No — but only the resit assessment needs to change"
       ],
-      "correct": 2
+      "correct": 0
     },
     {
       "q": "By what date must New Course Approvals or updates to courses (CA1/MA1 paperwork) for 28/29 launch be submitted?",
       "answers": [
         "Friday 19th September 2025",
-        "Friday 11th September 2026",
         "Friday 18th September 2026",
+        "Friday 11th September 2026",
         "Friday 26th June 2026"
       ],
-      "correct": 2
+      "correct": 1
     },
     {
       "q": "The MA1 updates being submitted in the next academic year are for which launch year?",
       "answers": [
         "26/27",
         "27/28",
-        "28/29",
-        "29/30"
+        "29/30",
+        "28/29"
       ],
-      "correct": 2
+      "correct": 3
     },
     {
-      "q": "How many times can an assessment normally be used within the same academic year before it must be replaced?",
+      "q": "Where can a moderator get hands-on support if they're unsure how to sample or complete the moderation form?",
       "answers": [
-        "Once only",
-        "Up to twice",
-        "A maximum of three times",
-        "Unlimited, provided the rubric is updated"
+        "Moderation drop-in sessions in the IDL",
+        "By scaling the cohort's marks to a normal distribution",
+        "By emailing the Education Operations team to complete the moderation form for them",
+        "By clicking 'Skip moderation and send to admin' to save time"
       ],
-      "correct": 2
-    },
-    {
-      "q": "Which document is student-facing and must be provided alongside the assessment brief?",
-      "answers": [
-        "The staff-facing marking guidance",
-        "The student-facing marking rubric",
-        "The model answers",
-        "The Internal Reviewer's checklist"
-      ],
-      "correct": 1
+      "correct": 0
     },
     {
       "q": "Within how many University working days must marks and feedback normally be returned to students?",
       "answers": [
         "10 working days",
         "15 working days",
-        "20 working days",
-        "25 working days"
+        "25 working days",
+        "20 working days"
+      ],
+      "correct": 3
+    },
+    {
+      "q": "A mean outside 55–65 (PGT) or an SD below 6 means…",
+      "answers": [
+        "Marks must be scaled",
+        "A Huddle is automatically required",
+        "Look harder — it's a prompt for the moderator's judgement, not a verdict",
+        "The marker has failed"
       ],
       "correct": 2
+    },
+    {
+      "q": "You've been invited to a Huddle. This is because…",
+      "answers": [
+        "Your marks were flawless",
+        "Your failure rate nudged over 10%, so now everyone gets a meeting",
+        "It's your birthday",
+        "AQA simply missed you"
+      ],
+      "correct": 1
     }
   ]
 }
