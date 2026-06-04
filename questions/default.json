@@ -1,94 +1,54 @@
 {
-  "title": "WMG AQA Essentials — Assessment, Rubrics, MA1 & CA1",
+  "title": "Quiz Night — General Knowledge",
   "questions": [
     {
-      "q": "When are assessments due to be submitted to AQ for the 26/27 assessment approval cycle?",
-      "answers": [
-        "Friday 18th September 2026",
-        "Friday 26th June 2026",
-        "Monday 1st June 2026",
-        "Friday 19th September 2025"
-      ],
-      "correct": 1
-    },
-    {
-      "q": "What must assessment rubrics contain to support faster and easier feedback?",
-      "answers": [
-        "A single generic mark band description used across all modules",
-        "Marks allocated separately for presentation, spelling, punctuation and grammar",
-        "The staff-facing marking guidance copied into each row",
-        "Learning outcome-specific wording, adapting the standard wording as appropriate"
-      ],
-      "correct": 3
-    },
-    {
-      "q": "Can an assessment stay the same from one academic year to the next?",
-      "answers": [
-        "No — assessments must be substantially different to last year and changed every academic year",
-        "Yes — provided the learning outcomes have not changed",
-        "Yes — provided the external examiner approves no change",
-        "No — but only the resit assessment needs to change"
-      ],
+      "q": "What is the capital city of Australia?",
+      "answers": ["Canberra", "Sydney", "Melbourne", "Perth"],
       "correct": 0
     },
     {
-      "q": "By what date must New Course Approvals or updates to courses (CA1/MA1 paperwork) for 28/29 launch be submitted?",
-      "answers": [
-        "Friday 19th September 2025",
-        "Friday 18th September 2026",
-        "Friday 11th September 2026",
-        "Friday 26th June 2026"
-      ],
-      "correct": 1
-    },
-    {
-      "q": "The MA1 updates being submitted in the next academic year are for which launch year?",
-      "answers": [
-        "26/27",
-        "27/28",
-        "29/30",
-        "28/29"
-      ],
-      "correct": 3
-    },
-    {
-      "q": "Where can a moderator get hands-on support if they're unsure how to sample or complete the moderation form?",
-      "answers": [
-        "Moderation drop-in sessions in the IDL",
-        "By scaling the cohort's marks to a normal distribution",
-        "By emailing the Education Operations team to complete the moderation form for them",
-        "By clicking 'Skip moderation and send to admin' to save time"
-      ],
-      "correct": 0
-    },
-    {
-      "q": "Within how many University working days must marks and feedback normally be returned to students?",
-      "answers": [
-        "10 working days",
-        "15 working days",
-        "25 working days",
-        "20 working days"
-      ],
-      "correct": 3
-    },
-    {
-      "q": "A mean outside 55–65 (PGT) or an SD below 6 means…",
-      "answers": [
-        "Marks must be scaled",
-        "A Huddle is automatically required",
-        "Look harder — it's a prompt for the moderator's judgement, not a verdict",
-        "The marker has failed"
-      ],
+      "q": "How many continents are there on Earth?",
+      "answers": ["Five", "Six", "Seven", "Eight"],
       "correct": 2
     },
     {
-      "q": "You've been invited to a Huddle. This is because…",
-      "answers": [
-        "Your marks were flawless",
-        "Your failure rate nudged over 10%, so now everyone gets a meeting",
-        "It's your birthday",
-        "AQA simply missed you"
-      ],
+      "q": "What is the chemical symbol for gold?",
+      "answers": ["Go", "Au", "Gd", "Ag"],
+      "correct": 1
+    },
+    {
+      "q": "Which is the largest planet in our solar system?",
+      "answers": ["Saturn", "Jupiter", "Neptune", "Earth"],
+      "correct": 1
+    },
+    {
+      "q": "In which year did humans first land on the Moon?",
+      "answers": ["1969", "1965", "1972", "1958"],
+      "correct": 0
+    },
+    {
+      "q": "Who painted the Mona Lisa?",
+      "answers": ["Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Michelangelo"],
+      "correct": 2
+    },
+    {
+      "q": "What is the largest mammal in the world?",
+      "answers": ["African elephant", "Giraffe", "Blue whale", "Hippopotamus"],
+      "correct": 2
+    },
+    {
+      "q": "How many sides does a hexagon have?",
+      "answers": ["Five", "Six", "Seven", "Eight"],
+      "correct": 1
+    },
+    {
+      "q": "Which country has the most natural lakes in the world?",
+      "answers": ["Russia", "United States", "Canada", "Finland"],
+      "correct": 2
+    },
+    {
+      "q": "What is the hardest naturally occurring substance on Earth?",
+      "answers": ["Gold", "Diamond", "Iron", "Quartz"],
       "correct": 1
     }
   ]
