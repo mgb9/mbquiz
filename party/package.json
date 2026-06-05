@@ -2,6 +2,7 @@
   "name": "wmg-quiz-party",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev":    "partykit dev",
     "deploy": "partykit deploy"

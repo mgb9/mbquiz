@@ -46,6 +46,7 @@ function connect(room) {
 
   ws.addEventListener('open', () => {
     console.log('[WMG Quiz Host] connected to room:', room);
+    hideHostBanner();
   });
   ws.addEventListener('message', e => {
     try { onMessage(JSON.parse(e.data)); } catch (err) { console.error(err); }
@@ -54,10 +55,31 @@ function connect(room) {
     // If ws has already been replaced by a newer connect() call, don't reconnect.
     if (ws !== thisWs) return;
     if (S.phase !== 'setup') {
+      showHostBanner('↻ Reconnecting…');
       setTimeout(() => connect(S.room), 2000);
     }
   });
   ws.addEventListener('error', () => ws.close());
+}
+
+// ── Host banner ──────────────────────────────────────────────────────────────
+// Fixed bottom strip for connection / error feedback (mirrors the player banner).
+function showHostBanner(text, isError = false) {
+  let el = document.getElementById('host-banner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'host-banner';
+    el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;padding:12px 16px;' +
+      'color:#fff;font-family:Lato,sans-serif;font-size:13px;font-weight:800;' +
+      'text-align:center;letter-spacing:1.5px;text-transform:uppercase;z-index:9999';
+    document.body.appendChild(el);
+  }
+  el.style.background = isError ? C.red : 'rgba(0,0,0,0.88)';
+  el.textContent = text;
+}
+
+function hideHostBanner() {
+  document.getElementById('host-banner')?.remove();
 }
 
 function send(msg) {
@@ -268,6 +290,20 @@ function _appendMuteBtn() {
 // ── Message handlers ───────────────────────────────────────────────────────
 function onMessage(msg) {
   switch (msg.type) {
+    case 'error': {
+      // The host optimistically advances to pre-question on Start; if the
+      // server rejects it, roll back to the lobby and explain why.
+      const copy = {
+        not_host:  'Another device is already hosting this room — pick a new room name.',
+        bad_quiz:  'That quiz couldn’t be loaded — check the question format.',
+        game_over: 'This game has already ended.',
+      }[msg.reason] || 'Something went wrong.';
+      if (S.phase === 'pre_question' || S.phase === 'question') setPhase('lobby');
+      showHostBanner(copy, true);
+      setTimeout(hideHostBanner, 6000);
+      break;
+    }
+
     case 'player_list':
       S.players      = msg.players || [];
       S.playerCount  = msg.count || S.players.length;

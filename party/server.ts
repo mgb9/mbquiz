@@ -84,7 +84,8 @@ export default class QuizServer implements Party.Server {
   // it; thereafter only messages carrying the matching token may drive the game.
   hostToken:        string  = "";
 
-  constructor(readonly room: Party.Room) {}
+  room: Party.Room;
+  constructor(room: Party.Room) { this.room = room; }
 
   // ── Persistence ───────────────────────────────────────────────────────────
 

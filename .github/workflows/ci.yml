@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Root tests use only Node built-ins + local files — no install needed.
+      - name: Run tests
+        run: npm test
+
+      - name: Install server deps
+        working-directory: party
+        run: npm ci
+
+      - name: Typecheck server
+        working-directory: party
+        run: npx tsc --noEmit

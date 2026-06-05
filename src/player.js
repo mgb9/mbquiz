@@ -144,6 +144,18 @@ function showGoFlash(cb) {
 function onMessage(msg) {
   switch (msg.type) {
 
+    case 'error': {
+      // Surface server rejections (e.g. joining a game that's already over)
+      // on the join screen instead of silently doing nothing.
+      const copy = msg.reason === 'game_over'
+        ? 'This game has already ended.'
+        : 'Couldn’t join — please try again.';
+      if (S.phase !== 'join') setPhase('join');
+      const errEl = document.getElementById('join-error');
+      if (errEl) { errEl.textContent = copy; errEl.style.display = 'block'; }
+      break;
+    }
+
     case 'joined':
     case 'rejoined':
       S.nickname = msg.nickname;
