@@ -47,6 +47,9 @@ function connect(room) {
   ws.addEventListener('open', () => {
     console.log('[WMG Quiz Host] connected to room:', room);
     hideHostBanner();
+    // Claim ownership of the room immediately — before the join code is shared —
+    // so nobody can pre-claim it by racing `start`. Re-asserted on every reconnect.
+    if (S.hostToken) ws.send(JSON.stringify({ type: 'claim_host', hostToken: S.hostToken }));
   });
   ws.addEventListener('message', e => {
     try { onMessage(JSON.parse(e.data)); } catch (err) { console.error(err); }
@@ -1343,13 +1346,18 @@ function downloadCSV() {
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
-const ADJECTIVES = ['swift','bright','bold','calm','keen','wise','warm','clear','cool','fine','pure','just'];
-const ANIMALS    = ['otter','hawk','wolf','bear','lynx','crane','fox','owl','deer','heron','raven','finch'];
+const ADJECTIVES = ['swift','bright','bold','calm','keen','wise','warm','clear','cool','fine','pure','just',
+                    'brave','quick','lucky','noble','sharp','quiet','merry','grand'];
+const ANIMALS    = ['otter','hawk','wolf','bear','lynx','crane','fox','owl','deer','heron','raven','finch',
+                    'tiger','moose','eagle','seal','bison','koala','gecko','panda'];
 
+// adjective-animal-NNN — ~20×20×900 ≈ 360k combinations (vs 144 before), so an
+// active room code can't be cheaply enumerated, while staying short to type.
 function randomRoom() {
-  const a = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const b = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-  return `${a}-${b}`;
+  const a   = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const b   = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  const num = 100 + Math.floor(Math.random() * 900);
+  return `${a}-${b}-${num}`;
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────

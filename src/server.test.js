@@ -228,3 +228,79 @@ test("rejoin with a wrong token fails", () => {
   send(server, bad, { type: "rejoin", nickname: "Alice", token: "WRONG" });
   assert.deepEqual(types(bad.inbox), ["rejoin_failed"]);
 });
+
+// ── claim_host handshake (anti-hijack) ───────────────────────────────────────
+
+test("claim_host claims an unclaimed room; a different token can't then drive it", () => {
+  const { server, host } = setup();
+  send(server, host, { type: "claim_host", hostToken: "OWNER" });
+  assert.equal(server.hostToken, "OWNER");
+
+  // An imposter who guessed the room code tries to take over / advance it.
+  const imposter = mockConn("imposter");
+  send(server, imposter, { type: "start", hostToken: "EVIL", questions: QUIZ });
+  send(server, imposter, { type: "next", hostToken: "EVIL" });
+  assert.equal(server.phase, "lobby", "imposter must not start or advance the game");
+  assert.ok(imposter.inbox.some((m) => m.type === "error" && m.reason === "not_host"));
+
+  // The real owner still runs the game.
+  send(server, host, { type: "start", hostToken: "OWNER", questions: QUIZ });
+  assert.equal(server.phase, "question");
+});
+
+test("a matching re-claim is a harmless no-op (reconnect)", () => {
+  const { server, host } = setup();
+  send(server, host, { type: "claim_host", hostToken: "OWNER" });
+  const reconnect = mockConn("host-2");
+  send(server, reconnect, { type: "claim_host", hostToken: "OWNER" });
+  assert.equal(server.hostToken, "OWNER");
+  assert.equal(reconnect.inbox.length, 0, "a matching re-claim sends nothing");
+});
+
+test("claim_host by a different token after a claim is told not_host", () => {
+  const { server, host } = setup();
+  send(server, host, { type: "claim_host", hostToken: "OWNER" });
+  const other = mockConn("other");
+  send(server, other, { type: "claim_host", hostToken: "NOPE" });
+  assert.deepEqual(types(other.inbox), ["error:not_host"]);
+  assert.equal(server.hostToken, "OWNER");
+});
+
+// ── Abuse limits ─────────────────────────────────────────────────────────────
+
+test("one connection can only register a single player", () => {
+  const { server } = setup();
+  const conn = mockConn("flooder");
+  for (let i = 0; i < 20; i++) {
+    send(server, conn, { type: "join", nickname: `bot${i}`, token: `t${i}` });
+  }
+  assert.equal(server.players.size, 1, "a single socket must not flood the lobby");
+});
+
+test("joining past the player cap returns room_full", () => {
+  const { server } = setup();
+  // Fill to the cap, one connection per player.
+  for (let i = 0; i < 300; i++) {
+    send(server, mockConn(`c${i}`), { type: "join", nickname: `p${i}`, token: `t${i}` });
+  }
+  assert.equal(server.players.size, 300);
+
+  const overflow = mockConn("overflow");
+  send(server, overflow, { type: "join", nickname: "late", token: "tl" });
+  assert.equal(server.players.size, 300, "no new player past the cap");
+  assert.deepEqual(types(overflow.inbox), ["error:room_full"]);
+});
+
+test("oversized frames are dropped before parsing", () => {
+  const { server } = setup();
+  const conn = mockConn("big");
+  const huge = JSON.stringify({ type: "join", nickname: "x".repeat(70 * 1024), token: "t" });
+  server.onMessage(huge, conn); // larger than MAX_MSG_BYTES
+  assert.equal(server.players.size, 0);
+});
+
+test("start clamps an absurd defaultTime into range", () => {
+  const { server, host } = setup();
+  send(server, host, { type: "start", hostToken: "HT", questions: QUIZ, defaultTime: 999999 });
+  assert.ok(server.defaultTime <= 300 && server.defaultTime >= 5);
+});

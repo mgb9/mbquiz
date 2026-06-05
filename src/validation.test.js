@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateQuestions } from "./validation.js";
+import {
+  validateQuestions,
+  MAX_QUESTIONS, MAX_ANSWERS, MAX_Q_LEN, MAX_ANSWER_LEN,
+} from "./validation.js";
 
 const valid = [
   { q: "Capital of France?", answers: ["Paris", "Lyon", "Nice", "Brest"], correct: 0 },
@@ -52,4 +55,31 @@ test("rejects empty or non-array payloads", () => {
   assert.equal(validateQuestions([]), null);
   assert.equal(validateQuestions(null), null);
   assert.equal(validateQuestions("nope"), null);
+});
+
+// ── Upper bounds (abuse limits) ──────────────────────────────────────────────
+
+const oneQ = (over = {}) => ({ q: "Q", answers: ["a", "b"], correct: 0, ...over });
+
+test("rejects more than MAX_QUESTIONS questions", () => {
+  const tooMany = Array.from({ length: MAX_QUESTIONS + 1 }, () => oneQ());
+  assert.equal(validateQuestions(tooMany), null);
+  // exactly at the limit is fine
+  const atLimit = Array.from({ length: MAX_QUESTIONS }, () => oneQ());
+  assert.equal(validateQuestions(atLimit)?.length, MAX_QUESTIONS);
+});
+
+test("rejects an over-long question string", () => {
+  assert.equal(validateQuestions([oneQ({ q: "x".repeat(MAX_Q_LEN + 1) })]), null);
+  assert.ok(validateQuestions([oneQ({ q: "x".repeat(MAX_Q_LEN) })]));
+});
+
+test("rejects more than MAX_ANSWERS answers", () => {
+  const answers = Array.from({ length: MAX_ANSWERS + 1 }, (_, i) => `a${i}`);
+  assert.equal(validateQuestions([{ q: "Q", answers, correct: 0 }]), null);
+});
+
+test("rejects an over-long answer string", () => {
+  assert.equal(validateQuestions([oneQ({ answers: ["a", "y".repeat(MAX_ANSWER_LEN + 1)] })]), null);
+  assert.ok(validateQuestions([oneQ({ answers: ["a", "y".repeat(MAX_ANSWER_LEN)] })]));
 });

@@ -32,6 +32,7 @@ type Phase = "lobby" | "question" | "reveal" | "leaderboard" | "end";
 
 interface JoinMsg       { type: "join";        nickname?: unknown; token?: unknown; }
 interface RejoinMsg     { type: "rejoin";      nickname?: unknown; token?: unknown; }
+interface ClaimHostMsg  { type: "claim_host";  hostToken?: unknown; }
 interface StartMsg      { type: "start";       hostToken?: unknown; questions?: unknown; title?: unknown; defaultTime?: unknown; flatScoring?: unknown; }
 interface BeginTimerMsg { type: "begin_timer"; hostToken?: unknown; }
 interface AnswerMsg     { type: "answer";      answerIndex?: unknown; }
@@ -39,10 +40,17 @@ interface NextMsg       { type: "next";        hostToken?: unknown; }
 interface EndMsg        { type: "end";         hostToken?: unknown; }
 
 type ClientMessage =
-  | JoinMsg | RejoinMsg | StartMsg | BeginTimerMsg | AnswerMsg | NextMsg | EndMsg;
+  | JoinMsg | RejoinMsg | ClaimHostMsg | StartMsg | BeginTimerMsg | AnswerMsg | NextMsg | EndMsg;
 
 // Messages that drive the game forward — only the host may send them.
 type HostMessage = StartMsg | BeginTimerMsg | NextMsg | EndMsg;
+
+// ── Abuse limits ──────────────────────────────────────────────────────────────
+const MAX_MSG_BYTES  = 64 * 1024; // drop frames larger than this
+const MAX_PLAYERS     = 300;       // per room
+const MAX_TITLE_LEN   = 100;
+const MIN_TIME_SECS   = 5;
+const MAX_TIME_SECS   = 300;
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 // Snapshot shape written to room storage. `conns` is intentionally excluded —
@@ -149,6 +157,8 @@ export default class QuizServer implements Party.Server {
   // ── Message routing ──────────────────────────────────────────────────────
 
   onMessage(raw: string, sender: Party.Connection) {
+    if (typeof raw !== "string" || raw.length > MAX_MSG_BYTES) return;
+
     let msg: ClientMessage;
     try { msg = JSON.parse(raw) as ClientMessage; } catch { return; }
     if (!msg || typeof msg.type !== "string") return;
@@ -159,6 +169,7 @@ export default class QuizServer implements Party.Server {
     switch (msg.type) {
       case "join":        this.handleJoin(msg, sender);        break;
       case "rejoin":      this.handleRejoin(msg, sender);      break;
+      case "claim_host":  this.handleClaimHost(msg, sender);   break;
       case "start":       this.handleStart(msg, sender);       break;
       case "begin_timer": this.handleBeginTimer(sender);       break;
       case "answer":      this.handleAnswer(msg, sender);      break;
@@ -195,6 +206,24 @@ export default class QuizServer implements Party.Server {
     return false;
   }
 
+  /**
+   * The host claims the room on connect — before the room code is ever shared
+   * with players — so a guesser can't pre-claim it by racing `start`. The first
+   * claim wins; reconnects re-assert the same token (no-op); a mismatching token
+   * is told it isn't the host.
+   */
+  handleClaimHost(msg: ClaimHostMsg, conn: Party.Connection) {
+    const supplied = String(msg.hostToken ?? "").trim();
+    if (!supplied) return;
+
+    if (!this.hostToken) {
+      this.hostToken = supplied;
+      this.persist();
+    } else if (supplied !== this.hostToken) {
+      conn.send(JSON.stringify({ type: "error", reason: "not_host" }));
+    }
+  }
+
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   handleJoin(msg: JoinMsg, conn: Party.Connection) {
@@ -203,9 +232,19 @@ export default class QuizServer implements Party.Server {
       return;
     }
 
+    // One identity per connection — stops a single socket flooding the lobby
+    // with unlimited nicknames.
+    if (this.conns.has(conn.id)) return;
+
     let name = String(msg.nickname ?? "").trim().slice(0, 32);
     const token = String(msg.token ?? "").trim();
     if (!name || !token) return;
+
+    // Cap the room size.
+    if (this.players.size >= MAX_PLAYERS) {
+      conn.send(JSON.stringify({ type: "error", reason: "room_full" }));
+      return;
+    }
 
     // Deduplicate nickname
     if (this.players.has(name)) {
@@ -259,8 +298,8 @@ export default class QuizServer implements Party.Server {
     // Claim host ownership of the room (authorizeHost already verified a token).
     this.hostToken    = String(msg.hostToken ?? "").trim();
     this.questions    = questions;
-    this.quizTitle    = String(msg.title ?? "WMG Quiz");
-    this.defaultTime  = Number(msg.defaultTime) || 30;
+    this.quizTitle    = String(msg.title ?? "WMG Quiz").slice(0, MAX_TITLE_LEN);
+    this.defaultTime  = Math.min(MAX_TIME_SECS, Math.max(MIN_TIME_SECS, Number(msg.defaultTime) || 30));
     this.flatScoring  = !!msg.flatScoring;
     this.currentQ     = 0;
     this.phase        = "question";

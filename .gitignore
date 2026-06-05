@@ -2,6 +2,9 @@
 node_modules/
 party/node_modules/
 
+# PartyKit local dev state
+.partykit/
+
 # macOS
 .DS_Store
 **/.DS_Store
