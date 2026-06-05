@@ -9,10 +9,13 @@ import QuizServer from "../party/server.ts";
 function mockRoom() {
   const broadcasts = [];
   const store = new Map();
+  const connections = new Map(); // id → conn, for getConnection()
   return {
     broadcasts,
     store,
+    connections,
     broadcast: (raw) => broadcasts.push(JSON.parse(raw)),
+    getConnection: (id) => connections.get(id),
     storage: {
       get: async (k) => (store.has(k) ? store.get(k) : null),
       put: async (k, v) => void store.set(k, v),
@@ -26,7 +29,11 @@ function mockConn(id) {
   return { id, inbox, send: (raw) => inbox.push(JSON.parse(raw)) };
 }
 
-const send = (server, conn, msg) => server.onMessage(JSON.stringify(msg), conn);
+// Register the connection with the room (so room.getConnection works) then deliver.
+const send = (server, conn, msg) => {
+  server.room.connections.set(conn.id, conn);
+  return server.onMessage(JSON.stringify(msg), conn);
+};
 
 const QUIZ = [
   { q: "Q1", answers: ["a", "b", "c", "d"], correct: 0 },
@@ -303,4 +310,49 @@ test("start clamps an absurd defaultTime into range", () => {
   const { server, host } = setup();
   send(server, host, { type: "start", hostToken: "HT", questions: QUIZ, defaultTime: 999999 });
   assert.ok(server.defaultTime <= 300 && server.defaultTime >= 5);
+});
+
+// ── Private results (no answer-log leak) ─────────────────────────────────────
+
+// Drive a one-question game to its end with a host and a player.
+function playToEnd(server, host, player) {
+  send(server, host, { type: "claim_host", hostToken: "HT" });
+  send(server, player, { type: "join", nickname: "Alice", token: "p1" });
+  send(server, host, { type: "start", hostToken: "HT", questions: [QUIZ[0]] });
+  send(server, host, { type: "begin_timer", hostToken: "HT" });
+  send(server, player, { type: "answer", answerIndex: 0 });
+  send(server, host, { type: "next", hostToken: "HT" }); // reveal
+  send(server, host, { type: "next", hostToken: "HT" }); // leaderboard
+  send(server, host, { type: "next", hostToken: "HT" }); // end
+}
+
+test("the broadcast game_over carries NO per-player answers", () => {
+  const { server, host, player } = setup();
+  playToEnd(server, host, player);
+  const broadcastOver = server.room.broadcasts.filter((m) => m.type === "game_over");
+  assert.ok(broadcastOver.length >= 1);
+  for (const m of broadcastOver) {
+    assert.equal(m.playerAnswers, undefined, "answers must not be broadcast to everyone");
+    assert.ok(m.leaderboard, "the public game_over still has the leaderboard");
+  }
+});
+
+test("the answer log is delivered privately to the host only", () => {
+  const { server, host, player } = setup();
+  playToEnd(server, host, player);
+  const hostOver = host.inbox.find((m) => m.type === "game_over" && m.playerAnswers);
+  assert.ok(hostOver, "host should receive the private answer log");
+  assert.ok(hostOver.playerAnswers.Alice, "host log includes per-player answers");
+  // The player only ever sent a direct message? No — they got nothing private.
+  assert.ok(!player.inbox.some((m) => m.type === "game_over" && m.playerAnswers),
+    "a player must never receive the answer log");
+});
+
+test("a reconnecting host after game over gets the results re-delivered", () => {
+  const { server, host, player } = setup();
+  playToEnd(server, host, player);
+  const host2 = mockConn("host-reconnect");
+  send(server, host2, { type: "claim_host", hostToken: "HT" });
+  const got = host2.inbox.find((m) => m.type === "game_over" && m.playerAnswers);
+  assert.ok(got, "reconnecting host should receive the answer log again");
 });

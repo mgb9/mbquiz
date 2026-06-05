@@ -91,6 +91,10 @@ export default class QuizServer implements Party.Server {
   // Secret minted by the host client at game creation. The first `start` claims
   // it; thereafter only messages carrying the matching token may drive the game.
   hostToken:        string  = "";
+  // Connection id of the current host socket (updated on claim/start/reconnect).
+  // Used to deliver the per-player answer log privately to the host only.
+  // Not persisted — connection ids are meaningless after a restart.
+  hostConnId:       string  = "";
 
   room: Party.Room;
   constructor(room: Party.Room) { this.room = room; }
@@ -217,9 +221,16 @@ export default class QuizServer implements Party.Server {
     if (!supplied) return;
 
     if (!this.hostToken) {
-      this.hostToken = supplied;
+      this.hostToken  = supplied;
+      this.hostConnId = conn.id;
       this.persist();
-    } else if (supplied !== this.hostToken) {
+    } else if (supplied === this.hostToken) {
+      // Reconnecting host — remember the new connection.
+      this.hostConnId = conn.id;
+      // If the game is already over, re-deliver the private results so a host
+      // who reloaded the final screen can still export them.
+      if (this.phase === "end") this.sendHostResults(conn);
+    } else {
       conn.send(JSON.stringify({ type: "error", reason: "not_host" }));
     }
   }
@@ -297,6 +308,7 @@ export default class QuizServer implements Party.Server {
 
     // Claim host ownership of the room (authorizeHost already verified a token).
     this.hostToken    = String(msg.hostToken ?? "").trim();
+    this.hostConnId   = conn.id;
     this.questions    = questions;
     this.quizTitle    = String(msg.title ?? "WMG Quiz").slice(0, MAX_TITLE_LEN);
     this.defaultTime  = Math.min(MAX_TIME_SECS, Math.max(MIN_TIME_SECS, Number(msg.defaultTime) || 30));
@@ -457,12 +469,23 @@ export default class QuizServer implements Party.Server {
   }
 
   broadcastGameOver() {
-    // Build per-player answer log for host CSV export
+    // Public: everyone sees the final leaderboard, but NOT each other's answers.
+    this.room.broadcast(JSON.stringify({
+      type:        "game_over",
+      leaderboard: this.getLeaderboard(),
+    }));
+    // Private: the per-player answer log goes only to the host, for CSV export.
+    const host = this.hostConnId ? this.room.getConnection(this.hostConnId) : undefined;
+    if (host) this.sendHostResults(host);
+  }
+
+  /** Send the full per-player answer log to a single (host) connection. */
+  sendHostResults(conn: Party.Connection) {
     const playerAnswers: Record<string, Record<number, number>> = {};
     for (const [name, player] of this.players) {
       playerAnswers[name] = player.answers;
     }
-    this.room.broadcast(JSON.stringify({
+    conn.send(JSON.stringify({
       type:          "game_over",
       leaderboard:   this.getLeaderboard(),
       playerAnswers,

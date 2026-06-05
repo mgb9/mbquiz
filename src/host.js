@@ -347,12 +347,15 @@ function onMessage(msg) {
       break;
 
     case 'game_over':
-      if (S.phase === 'leaderboard') {
-        S.leaderboard      = msg.leaderboard      || [];
-        S.playerAnswers    = msg.playerAnswers     || {};
-        S.questionCorrects = (msg.questions || []).map(q => q.correct);
-        setPhase('final');
-      }
+      // The server sends two game_over messages: a public one (leaderboard only,
+      // broadcast to all) and a private one to the host with the answer log.
+      // Merge whatever each carries so order/phase don't matter.
+      if (msg.leaderboard) S.leaderboard = msg.leaderboard;
+      if (msg.playerAnswers) S.playerAnswers = msg.playerAnswers;
+      if (msg.questions) S.questionCorrects = msg.questions.map(q => q.correct);
+      if (S.phase !== 'final') setPhase('final');
+      // Auto-save the results to this device once the private answer log arrives.
+      if (msg.playerAnswers) maybeAutoSave();
       break;
   }
 }
@@ -1285,6 +1288,9 @@ function htmlFinal() {
              font-family:Lato,sans-serif;font-size:14px;font-weight:800;text-transform:uppercase;cursor:pointer">
       ↓ Download results (CSV)
     </button>
+    <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.4);letter-spacing:0.5px">
+      Saved to this device automatically
+    </div>
     <div style="flex:1"></div>
     <button id="play-again-btn"
       style="padding:14px 22px;background:transparent;color:rgba(255,255,255,0.7);border:2px solid rgba(255,255,255,0.3);
@@ -1309,6 +1315,15 @@ function bindFinal() {
     send({ type: 'end' });
     window.location.reload();
   });
+}
+
+// Auto-save the results CSV to the host's device once per game (best-effort —
+// the "Download results" button remains as a manual fallback).
+let _autoSaved = false;
+function maybeAutoSave() {
+  if (_autoSaved) return;
+  _autoSaved = true;
+  try { downloadCSV(); } catch (e) { console.warn('auto-save failed', e); }
 }
 
 function downloadCSV() {
