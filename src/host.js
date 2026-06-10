@@ -558,7 +558,7 @@ function htmlSetup() {
   return `
 <style>
   #su-wrap { padding:56px }
-  #su-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:36px; flex:1; min-height:0 }
+  #su-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:36px; align-items:start }
   @media (max-width:860px) {
     #su-wrap { padding:32px }
     #su-grid { grid-template-columns:1fr }
@@ -611,8 +611,8 @@ function htmlSetup() {
           style="padding:9px 16px;border:2px solid ${C.dark};background:#fff;color:${C.ink};font-family:Lato,sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;cursor:pointer">{ } JSON</button>
       </div>
 
-      <!-- Build editor (default) -->
-      <div id="editor-panel" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-right:4px"></div>
+      <!-- Build editor (default) — grows naturally; the whole #su-wrap scrolls -->
+      <div id="editor-panel" style="display:flex;flex-direction:column;gap:14px"></div>
 
       <!-- Raw JSON (advanced) -->
       <textarea id="json-input" spellcheck="false" placeholder="${escHtml(placeholderJSON)}"
@@ -622,8 +622,8 @@ function htmlSetup() {
       <div id="json-status" style="font-size:13px;color:${C.grey};display:flex;align-items:center;gap:8px;min-height:20px"></div>
     </div>
 
-    <!-- Right: Game settings -->
-    <div style="display:flex;flex-direction:column;gap:20px">
+    <!-- Right: Game settings (sticky so Create stays in view while scrolling) -->
+    <div style="display:flex;flex-direction:column;gap:20px;position:sticky;top:8px;align-self:start">
       <div style="font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${C.inkSoft}">Game settings</div>
 
       <!-- Room name -->
