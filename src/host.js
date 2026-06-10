@@ -567,7 +567,7 @@ function htmlSetup() {
     #su-wrap { padding:20px }
   }
 </style>
-<div id="su-wrap" style="min-height:100vh;background:${C.chalk};color:${C.ink};font-family:Lato,sans-serif;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:auto">
+<div id="su-wrap" style="height:100vh;background:${C.chalk};color:${C.ink};font-family:Lato,sans-serif;box-sizing:border-box;display:flex;flex-direction:column;position:relative;overflow:auto">
   <div style="position:absolute;top:0;right:0;height:6px;width:40%;background:${C.orange}"></div>
 
   <!-- Header -->
@@ -592,7 +592,7 @@ function htmlSetup() {
   <div id="su-grid">
 
     <!-- Left: JSON editor -->
-    <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div style="font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${C.inkSoft}">Question bank</div>
         <div style="display:flex;gap:8px">
@@ -612,7 +612,7 @@ function htmlSetup() {
       </div>
 
       <!-- Build editor (default) -->
-      <div id="editor-panel" style="flex:1;min-height:260px;overflow:auto;display:flex;flex-direction:column;gap:14px"></div>
+      <div id="editor-panel" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-right:4px"></div>
 
       <!-- Raw JSON (advanced) -->
       <textarea id="json-input" spellcheck="false" placeholder="${escHtml(placeholderJSON)}"
