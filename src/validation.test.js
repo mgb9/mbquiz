@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   validateQuestions,
-  MAX_QUESTIONS, MAX_ANSWERS, MAX_Q_LEN, MAX_ANSWER_LEN,
+  MAX_QUESTIONS, MAX_ANSWERS, MAX_Q_LEN, MAX_ANSWER_LEN, MAX_IMAGE_LEN,
 } from "./validation.js";
 
 const valid = [
@@ -82,4 +82,27 @@ test("rejects more than MAX_ANSWERS answers", () => {
 test("rejects an over-long answer string", () => {
   assert.equal(validateQuestions([oneQ({ answers: ["a", "y".repeat(MAX_ANSWER_LEN + 1)] })]), null);
   assert.ok(validateQuestions([oneQ({ answers: ["a", "y".repeat(MAX_ANSWER_LEN)] })]));
+});
+
+// ── Optional image field ─────────────────────────────────────────────────────
+
+test("accepts a valid https image and keeps it on the question", () => {
+  const out = validateQuestions([oneQ({ image: "https://example.com/diagram.png" })]);
+  assert.equal(out?.[0].image, "https://example.com/diagram.png");
+});
+
+test("a question without an image has no image key", () => {
+  const out = validateQuestions([oneQ()]);
+  assert.equal("image" in out[0], false);
+});
+
+test("rejects a non-https image URL", () => {
+  assert.equal(validateQuestions([oneQ({ image: "http://example.com/x.png" })]), null);
+  assert.equal(validateQuestions([oneQ({ image: "ftp://example.com/x.png" })]), null);
+  assert.equal(validateQuestions([oneQ({ image: "example.com/x.png" })]), null);
+});
+
+test("rejects a non-string or over-long image", () => {
+  assert.equal(validateQuestions([oneQ({ image: 123 })]), null);
+  assert.equal(validateQuestions([oneQ({ image: "https://e.com/" + "x".repeat(MAX_IMAGE_LEN) })]), null);
 });

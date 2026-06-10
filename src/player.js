@@ -9,7 +9,7 @@
  */
 
 import { PARTYKIT_HOST } from './config.js';
-import { C, TILES, escHtml, shapeSVG } from './shared.js';
+import { C, TILES, escHtml, shapeSVG, questionImage } from './shared.js';
 import { scheduleTone } from './audio.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -127,8 +127,43 @@ function hideReconnectBanner() {
   document.getElementById('reconnect-banner')?.remove();
 }
 
+// ── Accessibility helpers ────────────────────────────────────────────────────
+function _reduceMotion() {
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Visually-hidden live region so screen readers hear question/result changes.
+function _srAnnounce(msg) {
+  let r = document.getElementById('sr-live');
+  if (!r) {
+    r = document.createElement('div');
+    r.id = 'sr-live';
+    r.setAttribute('aria-live', 'polite');
+    r.setAttribute('role', 'status');
+    r.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap';
+    document.body.appendChild(r);
+  }
+  r.textContent = '';
+  setTimeout(() => { r.textContent = msg; }, 60);
+}
+
+// Answer with the number keys 1–4 / letters A–D during a live question.
+function initA11yKeys() {
+  document.addEventListener('keydown', e => {
+    if (S.phase !== 'question') return;
+    if (e.target.matches && e.target.matches('input,textarea')) return;
+    let idx = -1;
+    if (e.key >= '1' && e.key <= '8') idx = +e.key - 1;
+    else { const L = 'ABCDEFGH'.indexOf(e.key.toUpperCase()); if (L >= 0) idx = L; }
+    if (idx < 0) return;
+    const btn = document.querySelector(`[data-answer="${idx}"]`);
+    if (btn) { e.preventDefault(); btn.click(); }
+  });
+}
+
 // "GO!" flash — shown when the host starts the timer, then fades out.
 function showGoFlash(cb) {
+  if (_reduceMotion()) { cb(); return; }   // honour reduced-motion preference
   const flash = document.createElement('div');
   flash.style.cssText = 'position:fixed;inset:0;background:' + C.orange +
     ';display:flex;align-items:center;justify-content:center;z-index:9990;pointer-events:none;transition:opacity 0.2s';
@@ -515,6 +550,7 @@ function htmlPreQuestion() {
   <div style="flex:1;padding:20px 22px 10px;display:flex;flex-direction:column;justify-content:flex-start;overflow:auto">
     <div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:${C.orange};text-transform:uppercase;margin-bottom:10px">Read the question</div>
     <div style="font-size:21px;font-weight:800;line-height:1.3;text-wrap:balance">${escHtml(q.q)}</div>
+    ${questionImage(q, 220)}
   </div>
 
   <!-- Disabled tiles (shape only, dimmed) — count matches answer count -->
@@ -554,6 +590,7 @@ function htmlQuestion() {
   <!-- Question text -->
   <div style="padding:16px 22px 10px">
     <div style="font-size:19px;font-weight:800;line-height:1.3;text-wrap:balance">${escHtml(q.q)}</div>
+    ${questionImage(q, 120)}
   </div>
 
   <!-- Answer tiles — fill remaining height; count driven by q.answers.length -->
@@ -561,17 +598,19 @@ function htmlQuestion() {
   return `<div style="flex:1;padding:6px 16px 16px;display:grid;${gridStyle};gap:10px;min-height:0">
     ${TILES.slice(0, count).map((t, i) => `
     <button data-answer="${i}"
+      aria-label="Answer ${t.letter}${q.answers[i] ? ': ' + escHtml(q.answers[i]) : ''}"
+      aria-keyshortcuts="${i + 1} ${t.letter}"
       style="background:${t.color};border:none;border-radius:0;cursor:pointer;
              display:flex;flex-direction:column;align-items:center;justify-content:center;
              gap:10px;padding:12px;-webkit-tap-highlight-color:transparent;
              touch-action:manipulation;position:relative;overflow:hidden;${span(i)}">
       ${shapeSVG(t.shape, 52, '#fff')}
-      <div style="background:rgba(0,0,0,0.22);padding:8px 10px;font-family:Lato,sans-serif;font-size:22px;font-weight:900;color:#fff;line-height:1">${t.letter}</div>
+      <div style="background:rgba(0,0,0,0.22);padding:8px 10px;font-family:Lato,sans-serif;font-size:22px;font-weight:900;color:#fff;line-height:1">${t.letter} <span style="opacity:.6;font-size:13px">· press ${i + 1}</span></div>
     </button>`).join('')}
   </div>`; })()}
 
   <div style="padding:0 22px 10px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.35);text-transform:uppercase;text-align:center">
-    Tap your answer
+    Tap, or press 1–${(S.currentQ?.answers?.length) || 4}
   </div>
 </div>`;
 }
@@ -589,6 +628,12 @@ function bindQuestion() {
       setPhase('locked');
     });
   });
+  // Announce the question + options to screen readers, with key hints.
+  const q = S.currentQ;
+  if (q) {
+    const opts = (q.answers || []).map((a, i) => `${TILES[i]?.letter || i + 1} (key ${i + 1}): ${a}`).join('. ');
+    _srAnnounce(`Question ${S.qIndex} of ${S.qTotal}. ${q.q}. Options: ${opts}. Press a number key or tap to answer.`);
+  }
 }
 
 function htmlLocked() {
@@ -630,6 +675,10 @@ function htmlLocked() {
 function bindReveal() {
   const wasCorrect = S.chosenAnswer === S.correct;
   if (wasCorrect) playCorrect(); else playWrong();
+  const correctText = S.currentQ?.answers?.[S.correct];
+  _srAnnounce(wasCorrect
+    ? `Correct! You earned ${S.roundScore} points.`
+    : `Incorrect. The right answer was ${correctText || ('option ' + (S.correct + 1))}.`);
 }
 
 function htmlReveal() {
@@ -844,6 +893,7 @@ function findRank(lb, name) {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 function init() {
+  initA11yKeys();
   const params = new URLSearchParams(window.location.search);
   const roomFromURL = params.get('room') || '';
 

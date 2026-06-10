@@ -21,7 +21,8 @@ interface Question {
   q: string;
   answers: string[];
   correct: number;
-  time?: number; // per-question override
+  time?: number;  // per-question override
+  image?: string; // optional https image URL
 }
 
 type Phase = "lobby" | "question" | "reveal" | "leaderboard" | "end";
@@ -333,7 +334,7 @@ export default class QuizServer implements Party.Server {
       type:              "timer_started",
       index:             this.currentQ,
       total:             this.questions.length,
-      question:          { q: q.q, answers: q.answers, time: q.time ?? this.defaultTime },
+      question:          { q: q.q, answers: q.answers, image: q.image, time: q.time ?? this.defaultTime },
       questionStartTime: this.questionStartTime,
     }));
     this.persist();
@@ -434,7 +435,7 @@ export default class QuizServer implements Party.Server {
       type:     "pre_question",
       index:    this.currentQ,
       total:    this.questions.length,
-      question: { q: q.q, answers: q.answers, time: q.time ?? this.defaultTime },
+      question: { q: q.q, answers: q.answers, image: q.image, time: q.time ?? this.defaultTime },
     }));
   }
 
@@ -461,7 +462,7 @@ export default class QuizServer implements Party.Server {
       type:        "reveal",
       correct:     q.correct,
       counts,
-      question:    { q: q.q, answers: q.answers },
+      question:    { q: q.q, answers: q.answers, image: q.image },
       roundScores,
       chosen,
       leaderboard: this.getLeaderboard(),
@@ -523,7 +524,7 @@ export default class QuizServer implements Party.Server {
           type:     "pre_question",
           index:    this.currentQ,
           total:    this.questions.length,
-          question: { q: q.q, answers: q.answers, time: q.time ?? this.defaultTime },
+          question: { q: q.q, answers: q.answers, image: q.image, time: q.time ?? this.defaultTime },
         }));
       } else {
         // Question in progress — already answered?
@@ -532,7 +533,7 @@ export default class QuizServer implements Party.Server {
           type:              alreadyAnswered ? "answer_received_late" : "timer_started",
           index:             this.currentQ,
           total:             this.questions.length,
-          question:          { q: q.q, answers: q.answers, time: q.time ?? this.defaultTime },
+          question:          { q: q.q, answers: q.answers, image: q.image, time: q.time ?? this.defaultTime },
           questionStartTime: this.questionStartTime,
           answerIndex:       alreadyAnswered ? this.answers.get(nickname)!.answerIndex : undefined,
           answerCount:       this.answers.size,
@@ -562,7 +563,7 @@ export default class QuizServer implements Party.Server {
         type:        "reveal",
         correct:     q.correct,
         counts,
-        question:    { q: q.q, answers: q.answers },
+        question:    { q: q.q, answers: q.answers, image: q.image },
         roundScores,
         chosen,
         leaderboard: this.getLeaderboard(),
