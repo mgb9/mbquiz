@@ -26,6 +26,13 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* Accessibility: visible keyboard focus + honour reduced-motion */
+  :focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  button:focus-visible, [data-answer]:focus-visible { outline: 4px solid #fff; outline-offset: -4px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  }
+
   html, body {
     height: 100%;
     font-family: Lato, system-ui, sans-serif;

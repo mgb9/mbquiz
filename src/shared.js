@@ -34,6 +34,18 @@ export function escHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// ── Question image ───────────────────────────────────────────────────────────
+// Optional per-question image (validated server-side to an https URL). Returns
+// '' when absent. `maxH` caps the displayed height so tiles still get room.
+export function questionImage(q, maxH) {
+  if (!q || !q.image) return '';
+  const src = escHtml(q.image);
+  const alt = escHtml(String(q.q || 'Question image').slice(0, 120));
+  return `<img src="${src}" alt="${alt}" loading="lazy" onerror="this.style.display='none'"` +
+    ` style="display:block;max-width:100%;max-height:${maxH}px;width:auto;margin:14px auto 0;` +
+    `border-radius:10px;object-fit:contain;box-shadow:0 8px 24px -12px rgba(0,0,0,0.5)"/>`;
+}
+
 // ── SVG shapes ─────────────────────────────────────────────────────────────
 export function shapeSVG(shape, size, color) {
   const p = `fill="${color}"`;

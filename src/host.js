@@ -8,7 +8,7 @@
  */
 
 import { PARTYKIT_HOST } from './config.js';
-import { C, TILES, escHtml, shapeSVG } from './shared.js';
+import { C, TILES, escHtml, shapeSVG, questionImage } from './shared.js';
 import { scheduleTone } from './audio.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -237,7 +237,12 @@ function startPodiumMusic() {
 }
 
 // Confetti burst using WMG brand colours — pure canvas, no library
+function _reduceMotion() {
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 function launchConfetti() {
+  if (_reduceMotion()) return;   // honour reduced-motion preference
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;';
   canvas.width  = window.innerWidth;
@@ -597,8 +602,21 @@ function htmlSetup() {
           </label>
         </div>
       </div>
+
+      <!-- Build / JSON tabs -->
+      <div style="display:flex;gap:6px">
+        <button id="tab-build" data-tab="build"
+          style="padding:9px 16px;border:2px solid ${C.dark};background:${C.dark};color:#fff;font-family:Lato,sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;cursor:pointer">✎ Build</button>
+        <button id="tab-json" data-tab="json"
+          style="padding:9px 16px;border:2px solid ${C.dark};background:#fff;color:${C.ink};font-family:Lato,sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;cursor:pointer">{ } JSON</button>
+      </div>
+
+      <!-- Build editor (default) -->
+      <div id="editor-panel" style="flex:1;min-height:260px;overflow:auto;display:flex;flex-direction:column;gap:14px"></div>
+
+      <!-- Raw JSON (advanced) -->
       <textarea id="json-input" spellcheck="false" placeholder="${escHtml(placeholderJSON)}"
-        style="flex:1;min-height:260px;background:#fff;border:2px solid ${C.dark};padding:20px 24px;
+        style="display:none;flex:1;min-height:260px;background:#fff;border:2px solid ${C.dark};padding:20px 24px;
                font-family:'SF Mono',Menlo,monospace;font-size:12px;line-height:1.55;color:${C.inkSoft};
                resize:none;outline:none;box-sizing:border-box;-webkit-appearance:none"></textarea>
       <div id="json-status" style="font-size:13px;color:${C.grey};display:flex;align-items:center;gap:8px;min-height:20px"></div>
@@ -673,16 +691,6 @@ function bindSetup() {
   let parsedData = null;
   let defaultSecs = 30;
   let flatScoring = false;
-
-  // Load default questions
-  fetch('questions/default.json')
-    .then(r => r.ok ? r.json() : null)
-    .then(data => {
-      if (data) {
-        jsonInput.value = JSON.stringify(data, null, 2);
-        validateJSON(jsonInput.value);
-      }
-    }).catch(() => {});
 
   // Time buttons
   document.querySelectorAll('.time-btn').forEach(btn => {
@@ -787,6 +795,148 @@ function bindSetup() {
     };
     setTimeout(tryQR, 80);
   });
+
+  // ── Build editor ───────────────────────────────────────────────────────────
+  const editorPanel = document.getElementById('editor-panel');
+  const DRAFT_KEY   = 'wmg-quiz-draft';
+  const INP = `width:100%;padding:9px 11px;border:2px solid ${C.dark};` +
+              `font-family:Lato,sans-serif;font-size:14px;color:${C.ink};outline:none;-webkit-appearance:none`;
+  const ICON = `border:2px solid ${C.dark};background:#fff;color:${C.ink};width:30px;height:30px;` +
+               `font-size:14px;font-weight:800;cursor:pointer;flex:none;line-height:1`;
+  let editorModel = { title: 'WMG Quiz', questions: [] };
+
+  const newQuestion = () => ({ q: '', image: '', answers: ['', ''], correct: 0, time: null, tf: false });
+
+  function modelFromData(d) {
+    editorModel = {
+      title: (d && d.title) || 'WMG Quiz',
+      questions: ((d && d.questions) || []).map(q => {
+        const answers = Array.isArray(q.answers) ? q.answers.slice() : ['', ''];
+        return {
+          q: q.q || '', image: q.image || '', answers,
+          correct: Number.isInteger(q.correct) ? q.correct : 0,
+          time: q.time || null,
+          tf: answers.length === 2 && answers[0] === 'True' && answers[1] === 'False',
+        };
+      }),
+    };
+    if (!editorModel.questions.length) editorModel.questions.push(newQuestion());
+  }
+
+  function answerRow(q, qi, a, ai, tf) {
+    const letter = 'ABCD'[ai] || (ai + 1);
+    return `<div style="display:flex;align-items:center;gap:8px">
+      <input type="radio" name="correct-${qi}" data-qi="${qi}" data-ai="${ai}" ${q.correct === ai ? 'checked' : ''}
+        aria-label="Mark ${letter} correct" title="Correct answer" style="width:20px;height:20px;accent-color:${C.lime};flex:none">
+      <span style="font-weight:900;color:${TILES[ai] ? TILES[ai].color : C.ink};width:14px;flex:none">${letter}</span>
+      <input data-field="answer" data-qi="${qi}" data-ai="${ai}" value="${escHtml(a)}" ${tf ? 'readonly' : ''}
+        placeholder="Answer ${letter}" aria-label="Answer ${letter} text" style="${INP};flex:1${tf ? ';background:#f3f3f3' : ''}">
+      ${!tf && q.answers.length > 2 ? `<button data-act="delopt" data-qi="${qi}" data-ai="${ai}" title="Remove option" aria-label="Remove option ${letter}" style="${ICON}">✕</button>` : ''}
+    </div>`;
+  }
+
+  function questionCard(q, qi) {
+    const tf = q.tf;
+    const seg = (on) => `padding:7px 12px;border:2px solid ${C.dark};background:${on ? C.dark : '#fff'};color:${on ? '#fff' : C.ink};font-family:Lato,sans-serif;font-size:12px;font-weight:800;cursor:pointer`;
+    return `<div style="border:2px solid ${C.dark};background:#fff;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:${C.orange}">Question ${qi + 1}</span>
+        <div style="display:flex;gap:5px">
+          <button data-act="moveup" data-qi="${qi}" title="Move up" aria-label="Move question ${qi + 1} up" style="${ICON}">↑</button>
+          <button data-act="movedown" data-qi="${qi}" title="Move down" aria-label="Move question ${qi + 1} down" style="${ICON}">↓</button>
+          <button data-act="delq" data-qi="${qi}" title="Remove question" aria-label="Remove question ${qi + 1}" style="${ICON};color:${C.red}">✕</button>
+        </div>
+      </div>
+      <input data-field="q" data-qi="${qi}" value="${escHtml(q.q)}" placeholder="Question text" aria-label="Question ${qi + 1} text" style="${INP};font-weight:700">
+      <input data-field="image" data-qi="${qi}" value="${escHtml(q.image || '')}" placeholder="🖼 Image URL — optional, https://…" aria-label="Question ${qi + 1} image URL" style="${INP};font-size:12px">
+      <div style="display:flex;gap:6px">
+        <button data-act="setmc" data-qi="${qi}" style="${seg(!tf)}">Multiple choice</button>
+        <button data-act="settf" data-qi="${qi}" style="${seg(tf)}">True / False</button>
+      </div>
+      ${q.answers.map((a, ai) => answerRow(q, qi, a, ai, tf)).join('')}
+      ${!tf && q.answers.length < 4 ? `<button data-act="addopt" data-qi="${qi}" style="align-self:flex-start;border:2px dashed ${C.grey};background:#fff;color:${C.inkSoft};padding:7px 12px;font-family:Lato,sans-serif;font-size:12px;font-weight:800;cursor:pointer">+ Add option</button>` : ''}
+    </div>`;
+  }
+
+  function renderEditor() {
+    editorPanel.innerHTML =
+      `<label style="display:block">
+         <span style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${C.inkSoft}">Quiz title</span>
+         <input data-field="title" value="${escHtml(editorModel.title || '')}" placeholder="My quiz" aria-label="Quiz title" style="${INP};margin-top:4px;font-weight:800">
+       </label>` +
+      editorModel.questions.map((q, qi) => questionCard(q, qi)).join('') +
+      `<button data-act="addq" style="padding:13px;border:2px dashed ${C.dark};background:#fff;color:${C.ink};font-family:Lato,sans-serif;font-size:14px;font-weight:800;cursor:pointer">+ Add question</button>`;
+  }
+
+  function serializeEditor() {
+    const out = {
+      title: editorModel.title || 'WMG Quiz',
+      questions: editorModel.questions.map(q => {
+        const o = { q: q.q, answers: q.answers.slice(), correct: q.correct };
+        if (q.image && q.image.trim()) o.image = q.image.trim();
+        if (q.time) o.time = q.time;
+        return o;
+      }),
+    };
+    jsonInput.value = JSON.stringify(out, null, 2);
+    validateJSON(jsonInput.value);
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(editorModel)); } catch {}
+  }
+
+  editorPanel.addEventListener('input', e => {
+    const f = e.target.dataset.field; if (!f) return;
+    const qi = +e.target.dataset.qi, ai = +e.target.dataset.ai;
+    if (f === 'title')       editorModel.title = e.target.value;
+    else if (f === 'q')      editorModel.questions[qi].q = e.target.value;
+    else if (f === 'image')  editorModel.questions[qi].image = e.target.value;
+    else if (f === 'answer') editorModel.questions[qi].answers[ai] = e.target.value;
+    serializeEditor();
+  });
+  editorPanel.addEventListener('change', e => {
+    if (e.target.type === 'radio' && (e.target.name || '').startsWith('correct-')) {
+      editorModel.questions[+e.target.dataset.qi].correct = +e.target.dataset.ai;
+      serializeEditor();
+    }
+  });
+  editorPanel.addEventListener('click', e => {
+    const btn = e.target.closest('[data-act]'); if (!btn) return;
+    const act = btn.dataset.act, qi = +btn.dataset.qi, ai = +btn.dataset.ai, m = editorModel;
+    if (act === 'addq') m.questions.push(newQuestion());
+    else if (act === 'delq') { m.questions.splice(qi, 1); if (!m.questions.length) m.questions.push(newQuestion()); }
+    else if (act === 'moveup' && qi > 0) { [m.questions[qi - 1], m.questions[qi]] = [m.questions[qi], m.questions[qi - 1]]; }
+    else if (act === 'movedown' && qi < m.questions.length - 1) { [m.questions[qi + 1], m.questions[qi]] = [m.questions[qi], m.questions[qi + 1]]; }
+    else if (act === 'addopt') { if (m.questions[qi].answers.length < 4) m.questions[qi].answers.push(''); }
+    else if (act === 'delopt') { const q = m.questions[qi]; q.answers.splice(ai, 1); if (q.correct >= q.answers.length) q.correct = 0; }
+    else if (act === 'settf') { const q = m.questions[qi]; q.tf = true; q.answers = ['True', 'False']; if (q.correct > 1) q.correct = 0; }
+    else if (act === 'setmc') { const q = m.questions[qi]; if (q.tf) { q.tf = false; q.answers = ['', '']; q.correct = 0; } }
+    else return;
+    renderEditor(); serializeEditor();
+  });
+
+  // Tab switching (Build ⇄ JSON)
+  function showTab(tab) {
+    const build = tab === 'build';
+    editorPanel.style.display = build ? 'flex' : 'none';
+    jsonInput.style.display   = build ? 'none' : 'block';
+    const tb = document.getElementById('tab-build'), tj = document.getElementById('tab-json');
+    tb.style.background = build ? C.dark : '#fff'; tb.style.color = build ? '#fff' : C.ink;
+    tj.style.background = build ? '#fff' : C.dark; tj.style.color = build ? C.ink : '#fff';
+    if (build) { try { modelFromData(JSON.parse(jsonInput.value)); renderEditor(); } catch {} }
+  }
+  document.getElementById('tab-build').addEventListener('click', () => showTab('build'));
+  document.getElementById('tab-json').addEventListener('click', () => showTab('json'));
+
+  // Initial content: restored draft → else default.json → else one blank question.
+  let draft = null;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch {}
+  if (draft && Array.isArray(draft.questions) && draft.questions.length) {
+    editorModel = draft; renderEditor(); serializeEditor();
+  } else {
+    fetch('questions/default.json')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { modelFromData(data || {}); renderEditor(); serializeEditor(); })
+      .catch(() => { modelFromData({}); renderEditor(); serializeEditor(); });
+  }
 }
 
 // ── 2. Lobby ───────────────────────────────────────────────────────────────
@@ -923,6 +1073,7 @@ function htmlPreQuestion() {
       <div style="font-size:20px;font-weight:700;color:${C.orange};letter-spacing:3px;text-transform:uppercase">Read the question</div>
     </div>
     <div style="font-size:60px;font-weight:900;line-height:1.1;letter-spacing:-1.5px;max-width:900px;text-wrap:balance">${escHtml(q.q)}</div>
+    ${questionImage(q, 320)}
     <div style="font-size:17px;color:rgba(255,255,255,0.55);max-width:560px">
       Take a moment — the timer starts when you're ready.
     </div>
@@ -1021,6 +1172,8 @@ function htmlQuestion() {
     <div style="font-size:40px;font-weight:900;line-height:1.1;letter-spacing:-0.8px;flex:1;text-wrap:balance">${escHtml(q.q)}</div>
   </div>
 
+  ${q.image ? `<div style="text-align:center;margin-bottom:18px">${questionImage(q, 170)}</div>` : ''}
+
   <!-- Answered progress bar -->
   <div style="height:5px;background:rgba(255,255,255,0.08);margin-bottom:20px;position:relative">
     <div id="answered-bar" style="position:absolute;inset:0;width:0%;background:${C.lime};transition:width 0.3s ease"></div>
@@ -1087,9 +1240,12 @@ function htmlReveal() {
   ${miniHeader(true, `<div style="background:${C.lime};color:${C.dark};padding:6px 14px;font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase">✓ Answer revealed</div>`)}
 
   <!-- Question -->
-  <div style="margin-bottom:20px">
-    <div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:6px">Question</div>
-    <div style="font-size:26px;font-weight:800;line-height:1.25">${escHtml(question.q)}</div>
+  <div style="margin-bottom:20px;display:flex;align-items:center;gap:18px">
+    ${question.image ? `<img src="${escHtml(question.image)}" alt="" loading="lazy" onerror="this.style.display='none'" style="height:64px;width:auto;max-width:120px;border-radius:8px;object-fit:cover;flex:none"/>` : ''}
+    <div>
+      <div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:6px">Question</div>
+      <div style="font-size:26px;font-weight:800;line-height:1.25">${escHtml(question.q)}</div>
+    </div>
   </div>
 
   <!-- Bar chart — N columns matching answer count -->
