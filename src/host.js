@@ -10,6 +10,7 @@
 import { PARTYKIT_HOST } from './config.js';
 import { C, TILES, escHtml, shapeSVG, questionImage } from './shared.js';
 import { scheduleTone } from './audio.js';
+import { createSessionStore } from './session.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
@@ -95,23 +96,15 @@ function send(msg) {
 // ── Host session ─────────────────────────────────────────────────────────────
 // A random secret minted per game and persisted so a host who reloads (or whose
 // socket drops) keeps control of the same room.
-const HOST_SESSION_KEY = 'wmg-quiz-host';
+const hostSessions = createSessionStore('wmg-quiz-host');
 
 function ensureHostToken(room) {
-  try {
-    const sessions = JSON.parse(localStorage.getItem(HOST_SESSION_KEY) || '{}');
-    const existing = sessions[room];
-    if (existing && Date.now() - existing.savedAt < 4 * 60 * 60 * 1000) {
-      return existing.token;
-    }
-    const token = (crypto.randomUUID?.() ?? String(Math.random()).slice(2) + String(Math.random()).slice(2));
-    sessions[room] = { token, savedAt: Date.now() };
-    localStorage.setItem(HOST_SESSION_KEY, JSON.stringify(sessions));
-    return token;
-  } catch {
-    // localStorage unavailable — fall back to an in-memory-only token.
-    return (crypto.randomUUID?.() ?? String(Math.random()).slice(2) + String(Math.random()).slice(2));
-  }
+  const existing = hostSessions.load(room);
+  if (existing) return existing.token;
+  const token = (crypto.randomUUID?.() ?? String(Math.random()).slice(2) + String(Math.random()).slice(2));
+  // If localStorage is unavailable, save() no-ops and the token is in-memory only.
+  hostSessions.save(room, { token });
+  return token;
 }
 
 // ── Audio ──────────────────────────────────────────────────────────────────

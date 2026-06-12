@@ -11,6 +11,7 @@
 import { PARTYKIT_HOST } from './config.js';
 import { C, TILES, escHtml, shapeSVG, questionImage } from './shared.js';
 import { scheduleTone } from './audio.js';
+import { createSessionStore } from './session.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
@@ -48,7 +49,7 @@ function connect() {
 
   ws.addEventListener('open', () => {
     hideReconnectBanner();
-    const stored = getSession(S.room);
+    const stored = sessions.load(S.room);
     if (stored && stored.nickname === S.nickname && stored.token === S.token) {
       send({ type: 'rejoin', nickname: S.nickname, token: S.token });
     } else {
@@ -196,14 +197,14 @@ function onMessage(msg) {
     case 'rejoined':
       S.nickname = msg.nickname;
       if (msg.score != null) S.score = msg.score;
-      saveSession(S.room, S.nickname, S.token);
+      sessions.save(S.room, { nickname: S.nickname, token: S.token });
       if (S.phase === 'join' || msg.type === 'rejoined') {
         setPhase('waiting');
       }
       break;
 
     case 'rejoin_failed':
-      clearSession(S.room);
+      sessions.clear(S.room);
       setPhase('join');
       break;
 
@@ -399,7 +400,7 @@ const ACCENT_LINE = `<svg width="64" height="8" viewBox="0 0 64 8" style="displa
 
 function htmlJoin() {
   const room = S.room || '';
-  const stored = room ? getSession(room) : null;
+  const stored = room ? sessions.load(room) : null;
   const nick = stored?.nickname || '';
 
   return `
@@ -857,33 +858,7 @@ function showLeaderboardModal() {
 }
 
 // ── Session storage ────────────────────────────────────────────────────────
-const SESSION_KEY = 'wmg-quiz-session';
-
-function saveSession(room, nickname, token) {
-  try {
-    const sessions = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
-    sessions[room] = { nickname, token, savedAt: Date.now() };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
-  } catch {}
-}
-
-function getSession(room) {
-  try {
-    const sessions = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
-    const s = sessions[room];
-    // Expire sessions older than 4 hours
-    if (s && Date.now() - s.savedAt < 4 * 60 * 60 * 1000) return s;
-  } catch {}
-  return null;
-}
-
-function clearSession(room) {
-  try {
-    const sessions = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
-    delete sessions[room];
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
-  } catch {}
-}
+const sessions = createSessionStore('wmg-quiz-session');
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 function findRank(lb, name) {
@@ -899,7 +874,7 @@ function init() {
 
   if (roomFromURL) {
     S.room = roomFromURL;
-    const stored = getSession(roomFromURL);
+    const stored = sessions.load(roomFromURL);
     if (stored) {
       // Auto-rejoin
       S.nickname = stored.nickname;
