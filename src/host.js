@@ -610,22 +610,31 @@ function htmlSetup() {
 }
 
 function bindSetup() {
-  const jsonInput  = document.getElementById('json-input');
-  const fileUpload = document.getElementById('file-upload');
-  const roomInput  = document.getElementById('room-input');
-  const roomRefresh = document.getElementById('room-refresh');
-  const createBtn  = document.getElementById('create-btn');
-  const statusEl   = document.getElementById('json-status');
-  const errorEl    = document.getElementById('setup-error');
+  const els = {
+    jsonInput:   document.getElementById('json-input'),
+    fileUpload:  document.getElementById('file-upload'),
+    roomInput:   document.getElementById('room-input'),
+    roomRefresh: document.getElementById('room-refresh'),
+    createBtn:   document.getElementById('create-btn'),
+    statusEl:    document.getElementById('json-status'),
+    errorEl:     document.getElementById('setup-error'),
+    editorPanel: document.getElementById('editor-panel'),
+  };
+  // Selections shared between the option pickers and the Create handler.
+  const setup = { parsedData: null, defaultSecs: 30, flatScoring: false };
 
-  let parsedData = null;
-  let defaultSecs = 30;
-  let flatScoring = false;
+  bindTimeScoringButtons(els, setup);
+  const validateJSON = makeJsonValidator(els, setup);
+  bindUploadAndCreate(els, setup, validateJSON);
+  bindQuestionEditor(els, validateJSON);
+}
 
+// Time / scoring pickers and the room-name refresh button.
+function bindTimeScoringButtons(els, setup) {
   // Time buttons
   document.querySelectorAll('.time-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      defaultSecs = parseInt(btn.dataset.secs, 10);
+      setup.defaultSecs = parseInt(btn.dataset.secs, 10);
       document.querySelectorAll('.time-btn').forEach(b => {
         b.style.background = b === btn ? C.dark : '#fff';
         b.style.color      = b === btn ? '#fff' : C.ink;
@@ -636,7 +645,7 @@ function bindSetup() {
   // Scoring buttons
   document.querySelectorAll('.score-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      flatScoring = btn.dataset.flat === '1';
+      setup.flatScoring = btn.dataset.flat === '1';
       document.querySelectorAll('.score-btn').forEach(b => {
         b.style.background = b === btn ? C.dark : '#fff';
         b.style.color      = b === btn ? '#fff' : C.ink;
@@ -645,57 +654,64 @@ function bindSetup() {
   });
 
   // Room name refresh
-  roomRefresh.addEventListener('click', () => { roomInput.value = randomRoom(); });
+  els.roomRefresh.addEventListener('click', () => { els.roomInput.value = randomRoom(); });
+}
 
-  // JSON validation
+// JSON validation wired to the textarea; returns validateJSON so the file
+// upload and the Build editor can revalidate after writing to the textarea.
+function makeJsonValidator(els, setup) {
   function validateJSON(text) {
-    if (!text.trim()) { setStatus(''); parsedData = null; setCreateEnabled(false); return; }
+    if (!text.trim()) { setStatus(''); setup.parsedData = null; setCreateEnabled(false); return; }
     try {
       const d = JSON.parse(text);
       if (!Array.isArray(d.questions) || d.questions.length === 0) throw new Error('No questions found');
-      parsedData = d;
+      setup.parsedData = d;
       setStatus(`<span style="color:${C.lime};font-weight:900">●</span> Loaded · <b style="color:${C.ink}">${d.questions.length} question${d.questions.length === 1 ? '' : 's'}</b>${d.title ? ` · ${escHtml(d.title)}` : ''}`);
       setCreateEnabled(true);
     } catch(e) {
       setStatus(`<span style="color:${C.red};font-weight:900">●</span> Invalid JSON: ${escHtml(e.message)}`);
-      parsedData = null;
+      setup.parsedData = null;
       setCreateEnabled(false);
     }
   }
 
-  function setStatus(html) { statusEl.innerHTML = html; }
+  function setStatus(html) { els.statusEl.innerHTML = html; }
   function setCreateEnabled(on) {
-    createBtn.disabled      = !on;
-    createBtn.style.opacity = on ? '1' : '0.5';
-    createBtn.style.pointerEvents = on ? 'auto' : 'none';
+    els.createBtn.disabled      = !on;
+    els.createBtn.style.opacity = on ? '1' : '0.5';
+    els.createBtn.style.pointerEvents = on ? 'auto' : 'none';
   }
 
-  jsonInput.addEventListener('input', () => validateJSON(jsonInput.value));
+  els.jsonInput.addEventListener('input', () => validateJSON(els.jsonInput.value));
 
-  // File upload
-  fileUpload.addEventListener('change', () => {
-    const file = fileUpload.files[0];
+  return validateJSON;
+}
+
+// File upload and the Create-game button (including the QR retry loop).
+function bindUploadAndCreate(els, setup, validateJSON) {
+  els.fileUpload.addEventListener('change', () => {
+    const file = els.fileUpload.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = e => { jsonInput.value = e.target.result; validateJSON(e.target.result); };
+    reader.onload = e => { els.jsonInput.value = e.target.result; validateJSON(e.target.result); };
     reader.readAsText(file);
   });
 
   // Create game
-  createBtn.addEventListener('click', () => {
-    errorEl.style.display = 'none';
-    if (!parsedData) return;
+  els.createBtn.addEventListener('click', () => {
+    els.errorEl.style.display = 'none';
+    if (!setup.parsedData) return;
 
-    const room = roomInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    if (!room) { errorEl.textContent = 'Please enter a valid room name.'; errorEl.style.display = 'block'; return; }
+    const room = els.roomInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (!room) { els.errorEl.textContent = 'Please enter a valid room name.'; els.errorEl.style.display = 'block'; return; }
 
     S.room        = room;
     S.hostToken   = ensureHostToken(room);
-    S.questions   = parsedData.questions;
-    S.quizTitle   = parsedData.title || 'WMG Quiz';
-    S.defaultTime = defaultSecs; // UI selection always wins over JSON's defaultTime
-    S.flatScoring = flatScoring;
-    S.qTotal      = parsedData.questions.length;
+    S.questions   = setup.parsedData.questions;
+    S.quizTitle   = setup.parsedData.title || 'WMG Quiz';
+    S.defaultTime = setup.defaultSecs; // UI selection always wins over JSON's defaultTime
+    S.flatScoring = setup.flatScoring;
+    S.qTotal      = setup.parsedData.questions.length;
 
     connect(room);
     setPhase('lobby');
@@ -725,9 +741,13 @@ function bindSetup() {
     };
     setTimeout(tryQR, 80);
   });
+}
 
-  // ── Build editor ───────────────────────────────────────────────────────────
-  const editorPanel = document.getElementById('editor-panel');
+// ── Build editor ───────────────────────────────────────────────────────────
+// The visual question editor (Build tab). Reaches outward only through the
+// JSON textarea (els.jsonInput) and validateJSON.
+function bindQuestionEditor(els, validateJSON) {
+  const editorPanel = els.editorPanel;
   const DRAFT_KEY   = 'wmg-quiz-draft';
   const INP = `width:100%;padding:9px 11px;border:2px solid ${C.dark};` +
               `font-family:Lato,sans-serif;font-size:14px;color:${C.ink};outline:none;-webkit-appearance:none`;
@@ -808,8 +828,8 @@ function bindSetup() {
         return o;
       }),
     };
-    jsonInput.value = JSON.stringify(out, null, 2);
-    validateJSON(jsonInput.value);
+    els.jsonInput.value = JSON.stringify(out, null, 2);
+    validateJSON(els.jsonInput.value);
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify(editorModel)); } catch {}
   }
 
@@ -847,11 +867,11 @@ function bindSetup() {
   function showTab(tab) {
     const build = tab === 'build';
     editorPanel.style.display = build ? 'flex' : 'none';
-    jsonInput.style.display   = build ? 'none' : 'block';
+    els.jsonInput.style.display = build ? 'none' : 'block';
     const tb = document.getElementById('tab-build'), tj = document.getElementById('tab-json');
     tb.style.background = build ? C.dark : '#fff'; tb.style.color = build ? '#fff' : C.ink;
     tj.style.background = build ? '#fff' : C.dark; tj.style.color = build ? C.ink : '#fff';
-    if (build) { try { modelFromData(JSON.parse(jsonInput.value)); renderEditor(); } catch {} }
+    if (build) { try { modelFromData(JSON.parse(els.jsonInput.value)); renderEditor(); } catch {} }
   }
   document.getElementById('tab-build').addEventListener('click', () => showTab('build'));
   document.getElementById('tab-json').addEventListener('click', () => showTab('json'));
