@@ -9,7 +9,7 @@
 
 import { PARTYKIT_HOST } from './config.js';
 import { C, TILES, escHtml, shapeSVG, questionImage } from './shared.js';
-import { scheduleTone } from './audio.js';
+import { createSynth, NOTES as N } from './audio.js';
 import { createSessionStore } from './session.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -108,79 +108,16 @@ function ensureHostToken(room) {
 }
 
 // ── Audio ──────────────────────────────────────────────────────────────────
-// All music is synthesised via the Web Audio API — no files, no CDN.
+// Music routes through a master gain (0.22) so the mute button can ramp it.
 
-let _actx = null, _mGain = null, _muted = false, _loopTimer = null, _anodes = [];
+const synth = createSynth({ masterGain: 0.22, attCap: 0.02, attMul: 0.12, relCap: 0.12, lead: 0.05 });
 let _host5sWarned = false; // prevents the 5-second stinger from firing more than once per question
 
-// Note frequencies (Hz)
-const N = {
-  G3:196.0, A3:220.0, B3:246.9,
-  C4:261.6, D4:293.7, E4:329.6, F4:349.2, G4:392.0, A4:440.0, B4:493.9,
-  C5:523.3, D5:587.3, E5:659.3, F5:698.5, G5:784.0, A5:880.0, B5:987.8, C6:1046.5,
-};
-
-function _getCtx() {
-  if (!_actx) {
-    try {
-      _actx = new (window.AudioContext || window.webkitAudioContext)();
-      _mGain = _actx.createGain();
-      _mGain.gain.value = 0.22;
-      _mGain.connect(_actx.destination);
-    } catch(e) { return null; }
-  }
-  // resume() is async but notes scheduled slightly in the future (≥50 ms)
-  // will still play correctly once the context unblocks.
-  if (_actx.state === 'suspended') _actx.resume().catch(() => {});
-  return _actx;
-}
-
-function stopMusic() {
-  clearTimeout(_loopTimer); _loopTimer = null;
-  _anodes.forEach(n => { try { n.stop(0); } catch(e) {} });
-  _anodes = [];
-}
-
-function toggleMute() {
-  _muted = !_muted;
-  if (_mGain) _mGain.gain.setTargetAtTime(_muted ? 0 : 0.22, _actx.currentTime, 0.05);
-  return _muted;
-}
-
-// Schedule an array of [freq, beats] (freq=0 → rest). Returns end time.
-function _sched(seq, bpm, wave, vol, t0) {
-  const ctx = _getCtx(); if (!ctx) return t0;
-  const beat = 60 / bpm;
-  let t = t0;
-  seq.forEach(([f, b]) => {
-    const dur = b * beat;
-    const osc = scheduleTone(ctx, _mGain, { freq: f, at: t, dur, wave, vol, attCap: 0.02, attMul: 0.12, relCap: 0.12 });
-    if (osc) _anodes.push(osc);
-    t += dur;
-  });
-  return t;
-}
-
-function _loop(seq, bpm, wave, vol) {
-  stopMusic();
-  const ctx = _getCtx(); if (!ctx) return;
-  const totalSecs = seq.reduce((s, [, b]) => s + b, 0) * (60 / bpm);
-  function go(start) {
-    _anodes = []; // prune expired refs each iteration
-    const end = _sched(seq, bpm, wave, vol, start);
-    _loopTimer = setTimeout(() => go(end), (totalSecs - 0.3) * 1000);
-  }
-  go(ctx.currentTime + 0.05);
-}
-
-function _once(seq, bpm, wave, vol) {
-  const ctx = _getCtx(); if (!ctx) return;
-  _sched(seq, bpm, wave, vol, ctx.currentTime + 0.05);
-}
+function stopMusic() { synth.stop(); }
 
 // Lobby: 4-phrase C-major melody, ~15s loop — long enough not to feel repetitive
 function startLobbyMusic() {
-  _loop([
+  synth.playLoop([
     // Phrase A — C major bounce
     [N.E5,.5],[N.G5,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],[N.D5,.5],[N.C5,1],
     [N.G5,.5],[N.E5,.5],[N.D5,.5],[N.C5,.5],[N.G4,1.5],[0,.5],
@@ -198,7 +135,7 @@ function startLobbyMusic() {
 
 // Question: 16-beat tense A-minor pulse (~7s loop) — two varied phrases
 function startQuestionMusic() {
-  _loop([
+  synth.playLoop([
     // Phrase 1
     [N.A4,.5],[0,.5],[N.A4,.5],[0,.5],
     [N.G4,.5],[0,.5],[N.A4,.5],[0,.5],
@@ -214,14 +151,14 @@ function startQuestionMusic() {
 
 // Reveal: ascending C-major fanfare (plays once)
 function playRevealStinger() {
-  _once([
+  synth.playOnce([
     [N.C5,.2],[N.E5,.2],[N.G5,.2],[N.C6,.45],
   ], 160, 'triangle', 0.18);
 }
 
 // Podium: triumphant C-major loop
 function startPodiumMusic() {
-  _loop([
+  synth.playLoop([
     [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
     [N.G5,.5],[N.C6,.5],[N.G5,1],
     [N.E5,.5],[N.G5,.5],[N.C6,.5],[N.G5,.5],
@@ -277,14 +214,14 @@ function launchConfetti() {
 function _appendMuteBtn() {
   const btn = document.createElement('button');
   btn.title = 'Toggle music';
-  btn.textContent = _muted ? '🔇' : '🔊';
+  btn.textContent = synth.muted ? '🔇' : '🔊';
   btn.style.cssText = 'position:fixed;bottom:16px;right:16px;background:rgba(255,255,255,0.13);' +
     'border:none;border-radius:50%;width:38px;height:38px;font-size:17px;' +
     'cursor:pointer;z-index:999;display:flex;align-items:center;justify-content:center;' +
     'transition:background 0.15s;';
   btn.addEventListener('mouseenter', () => { btn.style.background = 'rgba(255,255,255,0.25)'; });
   btn.addEventListener('mouseleave', () => { btn.style.background = 'rgba(255,255,255,0.13)'; });
-  btn.addEventListener('click', () => { btn.textContent = toggleMute() ? '🔇' : '🔊'; });
+  btn.addEventListener('click', () => { btn.textContent = synth.toggleMute() ? '🔇' : '🔊'; });
   app.appendChild(btn);
 }
 
@@ -408,7 +345,7 @@ function updateTimerDisplay(remaining, pct) {
   // 5-second audio warning (plays once per question)
   if (remaining === 5 && !_host5sWarned) {
     _host5sWarned = true;
-    _once([[N.G5, 0.12], [N.F5, 0.12], [N.C5, 0.22]], 220, 'triangle', 0.14); // descending G-F-C stinger
+    synth.playOnce([[N.G5, 0.12], [N.F5, 0.12], [N.C5, 0.22]], 220, 'triangle', 0.14); // descending G-F-C stinger
   }
 }
 

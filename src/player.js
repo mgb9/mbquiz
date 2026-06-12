@@ -10,7 +10,7 @@
 
 import { PARTYKIT_HOST } from './config.js';
 import { C, TILES, escHtml, shapeSVG, questionImage } from './shared.js';
-import { scheduleTone } from './audio.js';
+import { createSynth } from './audio.js';
 import { createSessionStore } from './session.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -78,36 +78,16 @@ function send(msg) {
 }
 
 // ── Player audio engine ────────────────────────────────────────────────────
-// Minimal Web Audio API synth — same pattern as host.js, no external deps.
+// One-shot effects straight to the destination — no master gain, no loops.
 
-let _pActx = null;
+const synth = createSynth({ attCap: 0.015, attMul: 0.1, relCap: 0.1, lead: 0.04 });
 let _warned5s = false;
 
-function _pGetCtx() {
-  if (!_pActx) {
-    try { _pActx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
-  }
-  if (_pActx.state === 'suspended') _pActx.resume().catch(() => {});
-  return _pActx;
-}
-
-// Play a sequence of [freq, beats] once. freq=0 → rest.
-function _pOnce(seq, bpm, wave, vol) {
-  const ctx = _pGetCtx(); if (!ctx) return;
-  const beat = 60 / bpm;
-  let t = ctx.currentTime + 0.04;
-  seq.forEach(([f, b]) => {
-    const dur = b * beat;
-    scheduleTone(ctx, ctx.destination, { freq: f, at: t, dur, wave, vol, attCap: 0.015, attMul: 0.1, relCap: 0.1 });
-    t += dur;
-  });
-}
-
-// Sound effects
-function playAnswerLock() { _pOnce([[784, 0.07]], 240, 'sine', 0.20); }         // G5 bip
-function playCorrect()    { _pOnce([[523.3, 0.18],[659.3, 0.18],[784, 0.32]], 210, 'triangle', 0.18); } // C5-E5-G5
-function playWrong()      { _pOnce([[220, 0.28]], 120, 'sawtooth', 0.12); }     // A3 thud
-function play5sWarning()  { _pOnce([[784, 0.12],[698.5, 0.12],[523.3, 0.22]], 220, 'triangle', 0.13); } // G5-F5-C5 descending
+// Sound effects — sequences of [freq, beats]
+function playAnswerLock() { synth.playOnce([[784, 0.07]], 240, 'sine', 0.20); }         // G5 bip
+function playCorrect()    { synth.playOnce([[523.3, 0.18],[659.3, 0.18],[784, 0.32]], 210, 'triangle', 0.18); } // C5-E5-G5
+function playWrong()      { synth.playOnce([[220, 0.28]], 120, 'sawtooth', 0.12); }     // A3 thud
+function play5sWarning()  { synth.playOnce([[784, 0.12],[698.5, 0.12],[523.3, 0.22]], 220, 'triangle', 0.13); } // G5-F5-C5 descending
 
 // ── UI helpers ─────────────────────────────────────────────────────────────
 
