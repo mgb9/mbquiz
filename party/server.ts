@@ -439,7 +439,8 @@ export default class QuizServer implements Party.Server {
     }));
   }
 
-  broadcastReveal() {
+  /** Reveal payload for the current question — shared by broadcast and rejoin. */
+  private buildRevealData() {
     const q            = this.questions[this.currentQ];
     const timeLimitSecs = q.time ?? this.defaultTime;
     const counts       = Array(q.answers.length).fill(0);
@@ -458,15 +459,19 @@ export default class QuizServer implements Party.Server {
       });
     }
 
-    this.room.broadcast(JSON.stringify({
-      type:        "reveal",
+    return {
+      type:        "reveal" as const,
       correct:     q.correct,
       counts,
       question:    { q: q.q, answers: q.answers, image: q.image },
       roundScores,
       chosen,
       leaderboard: this.getLeaderboard(),
-    }));
+    };
+  }
+
+  broadcastReveal() {
+    this.room.broadcast(JSON.stringify(this.buildRevealData()));
   }
 
   broadcastGameOver() {
@@ -543,31 +548,7 @@ export default class QuizServer implements Party.Server {
 
     } else if (this.phase === "reveal") {
       // Re-send the reveal so the player sees results
-      const counts      = Array(q.answers.length).fill(0);
-      const roundScores: Record<string, number> = {};
-      const chosen:      Record<string, number> = {};
-      const timeLimitSecs = q.time ?? this.defaultTime;
-
-      for (const [name, answer] of this.answers) {
-        counts[answer.answerIndex]++;
-        chosen[name] = answer.answerIndex;
-        roundScores[name] = scoreAnswer({
-          correct:       answer.answerIndex === q.correct,
-          flat:          this.flatScoring,
-          answeredAt:    answer.answeredAt,
-          questionStart: this.questionStartTime,
-          timeLimitSecs,
-        });
-      }
-      conn.send(JSON.stringify({
-        type:        "reveal",
-        correct:     q.correct,
-        counts,
-        question:    { q: q.q, answers: q.answers, image: q.image },
-        roundScores,
-        chosen,
-        leaderboard: this.getLeaderboard(),
-      }));
+      conn.send(JSON.stringify(this.buildRevealData()));
 
     } else if (this.phase === "leaderboard") {
       conn.send(JSON.stringify({
