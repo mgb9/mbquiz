@@ -447,7 +447,7 @@ function bindJoin() {
     S.token    = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
     // Pre-create AudioContext while we have a user gesture so sounds work later
-    _pGetCtx();
+    synth.unlock();
 
     // Optimistic waiting screen while connecting
     setPhase('waiting');

@@ -67,6 +67,13 @@ export function createSynth({ masterGain = null, attCap, attMul, relCap, lead = 
   }
 
   return {
+    /**
+     * Create/resume the AudioContext without playing anything. Call from a
+     * user-gesture handler when later sounds will fire outside one (e.g. on
+     * WebSocket messages), so the browser doesn't block them.
+     */
+    unlock() { getCtx(); },
+
     /** Play a [freq, beats] sequence once. */
     playOnce(seq, bpm, wave, vol) {
       const c = getCtx(); if (!c) return;
