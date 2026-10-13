@@ -462,10 +462,12 @@ export default class QuizServer {
     const counts       = Array(q.answers.length).fill(0);
     const roundScores: Record<string, number> = {};
     const chosen:      Record<string, number> = {};
+    const answerTimes: Record<string, number> = {}; // nickname → ms from timer start to answer
 
     for (const [name, answer] of this.answers) {
       counts[answer.answerIndex]++;
       chosen[name] = answer.answerIndex;
+      answerTimes[name] = Math.max(0, answer.answeredAt - this.questionStartTime);
       roundScores[name] = scoreAnswer({
         correct:       answer.answerIndex === q.correct,
         flat:          this.flatScoring,
@@ -482,6 +484,7 @@ export default class QuizServer {
       question:    { q: q.q, answers: q.answers, image: q.image },
       roundScores,
       chosen,
+      answerTimes,
       leaderboard: this.getLeaderboard(),
     };
   }

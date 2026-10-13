@@ -23,7 +23,7 @@ const S = {
   currentQ:      null,     // { q, answers, time }
   qIndex:        0,
   qTotal:        0,
-  questionStart: 0,        // server ms timestamp
+  answerTime:    null,     // ms from timer start to our answer (server-measured), set on reveal
   chosenAnswer:  null,
   roundScore:    0,
   rankPos:       0,
@@ -208,7 +208,6 @@ function onMessage(msg) {
       S.currentQ      = msg.question;
       S.qIndex        = msg.index + 1;
       S.qTotal        = msg.total;
-      S.questionStart = msg.questionStartTime;
       // Flash "GO!" then switch to question (mid-question rejoin skips the flash)
       if (S.phase === 'pre_question') {
         showGoFlash(() => {
@@ -225,7 +224,6 @@ function onMessage(msg) {
       S.currentQ      = msg.question;
       S.qIndex        = msg.index + 1;
       S.qTotal        = msg.total;
-      S.questionStart = msg.questionStartTime;
       S.chosenAnswer  = msg.answerIndex;
       S.answeredCount = msg.answerCount || 0;
       S.totalPlayers  = msg.playerCount || 0;
@@ -255,6 +253,7 @@ function onMessage(msg) {
       S.leaderboard = msg.leaderboard || [];
       const wasCorrect = S.chosenAnswer === msg.correct;
       S.roundScore = (msg.roundScores && msg.roundScores[S.nickname]) || 0;
+      S.answerTime = msg.answerTimes?.[S.nickname] ?? null;
       if (wasCorrect) S.score += S.roundScore;
 
       // Rank change
@@ -700,7 +699,7 @@ function htmlReveal() {
       <div style="width:1px;height:44px;background:rgba(255,255,255,0.2)"></div>
       <div style="flex:1;font-size:13px;font-weight:600;opacity:0.85;line-height:1.35">
         ${wasCorrect
-          ? `Speed bonus · answered in ${((Date.now() - S.questionStart) / 1000).toFixed(1)}s`
+          ? `Speed bonus${S.answerTime != null ? ` · answered in ${(S.answerTime / 1000).toFixed(1)}s` : ''}`
           : `Correct answer: <strong>${escHtml(S.currentQ?.answers?.[correct] ?? correctTile.letter)}</strong>`}
       </div>
     </div>

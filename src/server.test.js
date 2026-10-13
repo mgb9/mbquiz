@@ -176,6 +176,21 @@ test("a wrong answer scores zero", () => {
   assert.equal(reveal.roundScores.Bob, 0);
 });
 
+test("reveal reports each player's answer time, not time-to-reveal", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+  const { server, host, player, room } = setup();
+  send(server, player, { type: "join", nickname: "Alice", token: "p1" });
+  send(server, host, { type: "start", hostToken: "HT", questions: QUIZ });
+  send(server, host, { type: "begin_timer", hostToken: "HT" });
+  t.mock.timers.tick(4_200);
+  send(server, player, { type: "answer", answerIndex: 0 });
+  t.mock.timers.tick(20_000); // host waits before revealing
+  send(server, host, { type: "next", hostToken: "HT" });
+
+  const reveal = room.broadcasts.find((m) => m.type === "reveal");
+  assert.equal(reveal.answerTimes.Alice, 4_200);
+});
+
 // ── Rejoin + persistence (durability) ────────────────────────────────────────
 
 test("late join after game over is refused with error:game_over", () => {
