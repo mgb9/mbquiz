@@ -7,7 +7,7 @@
  * Space bar starts the timer on the pre-question screen.
  */
 
-import { PARTYKIT_HOST } from './config.js';
+import { roomSocketUrl } from './config.js';
 import { C, TILES, escHtml, shapeSVG, questionImage } from './shared.js';
 import { createSynth, NOTES as N } from './audio.js';
 import { createSessionStore } from './session.js';
@@ -41,7 +41,7 @@ let ws = null;
 
 function connect(room) {
   if (ws) ws.close();
-  const url = `wss://${PARTYKIT_HOST}/party/${encodeURIComponent(room)}`;
+  const url = roomSocketUrl(room);
   ws = new WebSocket(url);
   const thisWs = ws; // capture so the close handler knows if it's been superseded
 

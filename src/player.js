@@ -8,7 +8,7 @@
  * students who lock their phone or switch apps can rejoin seamlessly.
  */
 
-import { PARTYKIT_HOST } from './config.js';
+import { roomSocketUrl } from './config.js';
 import { C, TILES, escHtml, shapeSVG, questionImage } from './shared.js';
 import { createSynth } from './audio.js';
 import { createSessionStore } from './session.js';
@@ -44,7 +44,7 @@ function connect() {
   if (reconnectTimeout) { clearTimeout(reconnectTimeout); reconnectTimeout = null; }
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-  const url = `wss://${PARTYKIT_HOST}/party/${encodeURIComponent(S.room)}`;
+  const url = roomSocketUrl(S.room);
   ws = new WebSocket(url);
 
   ws.addEventListener('open', () => {

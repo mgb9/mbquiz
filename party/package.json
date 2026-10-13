@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev":    "partykit dev",
-    "deploy": "partykit deploy"
+    "dev":    "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types":  "wrangler types"
   },
   "dependencies": {
-    "partykit":   "^0.0.111",
-    "partysocket": "^1.0.2"
+    "partyserver": "^0.5.10"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "wrangler":   "^4.149.0"
   }
 }

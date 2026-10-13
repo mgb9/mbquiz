@@ -1,8 +1,24 @@
-import type * as Party from "partykit/server";
 import { scoreAnswer } from "../src/scoring.js";
 import { validateQuestions } from "../src/validation.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+// The slice of the runtime the game logic touches. Implemented by the
+// PartyServer Durable Object in worker.ts, and by mockRoom() in the tests.
+export interface Conn {
+  id: string;
+  send(msg: string): void;
+}
+
+export interface Room {
+  broadcast(msg: string): void;
+  getConnection(id: string): Conn | undefined;
+  storage: {
+    get<T>(key: string): Promise<T | undefined>;
+    put<T>(key: string, value: T): Promise<void>;
+    delete(key: string): Promise<boolean>;
+  };
+}
 
 interface Player {
   name: string;
@@ -73,7 +89,7 @@ interface Snapshot {
 
 // ── Server ────────────────────────────────────────────────────────────────────
 
-export default class QuizServer implements Party.Server {
+export default class QuizServer {
   // Keyed by nickname so it survives connection drops / reconnects.
   players = new Map<string, Player>();
   // connectionId → nickname — populated on join/rejoin, cleared on close.
@@ -97,8 +113,8 @@ export default class QuizServer implements Party.Server {
   // Not persisted — connection ids are meaningless after a restart.
   hostConnId:       string  = "";
 
-  room: Party.Room;
-  constructor(room: Party.Room) { this.room = room; }
+  room: Room;
+  constructor(room: Room) { this.room = room; }
 
   // ── Persistence ───────────────────────────────────────────────────────────
 
@@ -143,7 +159,7 @@ export default class QuizServer implements Party.Server {
 
   // ── Connection lifecycle ─────────────────────────────────────────────────
 
-  onConnect(conn: Party.Connection) {
+  onConnect(conn: Conn) {
     // If a host connects (or reconnects) during the lobby, immediately send
     // the current player list so the count is never stale after a reconnect.
     if (this.phase === "lobby") {
@@ -155,13 +171,13 @@ export default class QuizServer implements Party.Server {
     }
   }
 
-  onClose(conn: Party.Connection) {
+  onClose(conn: Conn) {
     this.conns.delete(conn.id);
   }
 
   // ── Message routing ──────────────────────────────────────────────────────
 
-  onMessage(raw: string, sender: Party.Connection) {
+  onMessage(raw: string, sender: Conn) {
     if (typeof raw !== "string" || raw.length > MAX_MSG_BYTES) return;
 
     let msg: ClientMessage;
@@ -195,7 +211,7 @@ export default class QuizServer implements Party.Server {
    * the room's hostToken; from then on every control message must present it.
    * A `start` arriving after the token is claimed is rejected unless it matches.
    */
-  authorizeHost(msg: HostMessage, conn: Party.Connection): boolean {
+  authorizeHost(msg: HostMessage, conn: Conn): boolean {
     const supplied = String(msg.hostToken ?? "").trim();
 
     // First `start` with a token claims the room.
@@ -217,7 +233,7 @@ export default class QuizServer implements Party.Server {
    * claim wins; reconnects re-assert the same token (no-op); a mismatching token
    * is told it isn't the host.
    */
-  handleClaimHost(msg: ClaimHostMsg, conn: Party.Connection) {
+  handleClaimHost(msg: ClaimHostMsg, conn: Conn) {
     const supplied = String(msg.hostToken ?? "").trim();
     if (!supplied) return;
 
@@ -238,7 +254,7 @@ export default class QuizServer implements Party.Server {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  handleJoin(msg: JoinMsg, conn: Party.Connection) {
+  handleJoin(msg: JoinMsg, conn: Conn) {
     if (this.phase === "end") {
       conn.send(JSON.stringify({ type: "error", reason: "game_over" }));
       return;
@@ -279,7 +295,7 @@ export default class QuizServer implements Party.Server {
     this.persist();
   }
 
-  handleRejoin(msg: RejoinMsg, conn: Party.Connection) {
+  handleRejoin(msg: RejoinMsg, conn: Conn) {
     const name  = String(msg.nickname ?? "").trim();
     const token = String(msg.token   ?? "").trim();
     const player = this.players.get(name);
@@ -298,7 +314,7 @@ export default class QuizServer implements Party.Server {
     }
   }
 
-  handleStart(msg: StartMsg, conn: Party.Connection) {
+  handleStart(msg: StartMsg, conn: Conn) {
     if (this.phase !== "lobby") return;
 
     const questions = validateQuestions(msg.questions);
@@ -323,7 +339,7 @@ export default class QuizServer implements Party.Server {
     this.persist();
   }
 
-  handleBeginTimer(_conn: Party.Connection) {
+  handleBeginTimer(_conn: Conn) {
     if (this.phase !== "question" || this.timerStarted) return;
 
     this.timerStarted      = true;
@@ -340,7 +356,7 @@ export default class QuizServer implements Party.Server {
     this.persist();
   }
 
-  handleAnswer(msg: AnswerMsg, conn: Party.Connection) {
+  handleAnswer(msg: AnswerMsg, conn: Conn) {
     if (this.phase !== "question" || !this.timerStarted) return;
 
     const name = this.conns.get(conn.id);
@@ -368,7 +384,7 @@ export default class QuizServer implements Party.Server {
     this.persist();
   }
 
-  handleNext(_conn: Party.Connection) {
+  handleNext(_conn: Conn) {
     if (this.phase === "question") {
       // Freeze answers, calculate scores, show reveal
       this.calculateScores();
@@ -486,7 +502,7 @@ export default class QuizServer implements Party.Server {
   }
 
   /** Send the full per-player answer log to a single (host) connection. */
-  sendHostResults(conn: Party.Connection) {
+  sendHostResults(conn: Conn) {
     const playerAnswers: Record<string, Record<number, number>> = {};
     for (const [name, player] of this.players) {
       playerAnswers[name] = player.answers;
@@ -518,7 +534,7 @@ export default class QuizServer implements Party.Server {
   /**
    * Send the current game state to a freshly-connected / rejoined player.
    */
-  sendCurrentState(conn: Party.Connection, nickname: string) {
+  sendCurrentState(conn: Conn, nickname: string) {
     if (this.phase === "lobby") return; // nothing to send
 
     const q = this.questions[this.currentQ];

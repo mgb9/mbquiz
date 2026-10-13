@@ -2,8 +2,8 @@
 node_modules/
 party/node_modules/
 
-# PartyKit local dev state
-.partykit/
+# Wrangler local dev state
+.wrangler/
 
 # macOS
 .DS_Store

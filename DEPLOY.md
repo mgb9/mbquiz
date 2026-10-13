@@ -5,7 +5,14 @@ The app has **two independently deployed halves** that share a wire protocol:
 | Half       | What            | How it deploys                                  |
 | ---------- | --------------- | ----------------------------------------------- |
 | **Client** | `index.html`, `play.html`, `src/*` | GitHub Pages, automatically on every push to `main` ([.github/workflows/pages.yml](.github/workflows/pages.yml)) |
-| **Server** | `party/server.ts` | PartyKit, manually via `cd party && npx partykit deploy` |
+| **Server** | `party/server.ts` + `party/worker.ts` | Cloudflare Workers (PartyServer on Durable Objects), manually via `cd party && npx wrangler deploy` |
+
+## One-time setup
+
+```sh
+cd party && npm ci
+npx wrangler login   # opens a browser to authorise your Cloudflare account
+```
 
 ## ⚠️ Deploy order matters
 
@@ -25,25 +32,33 @@ So the safe sequence for a protocol-affecting change is:
 
 1. `git push origin main` — wait for the **Pages** action to go green
    (`gh run watch <id> --exit-status`). The new client is now live.
-2. `cd party && npx partykit deploy` — roll the server forward to match.
+2. `cd party && npx wrangler deploy` — roll the server forward to match.
 
 For server-only or client-only changes the order doesn't matter.
 
 ## Quick reference
 
 ```sh
-# Deploy the server (PartyKit)
-cd party && npx partykit deploy
+# Deploy the server (Cloudflare Workers)
+cd party && npx wrangler deploy
 
 # Deploy the client (GitHub Pages) — just push main
 git push origin main
 
 # Run the test suite before deploying
 npm test
+
+# Local dev: server on :8787, client on :4321 (pages on localhost talk to :8787)
+cd party && npx wrangler dev
+npx serve -p 4321 .
 ```
 
 ## Configuration
 
-The client points at the deployed PartyKit host in
-[src/config.js](src/config.js) (`PARTYKIT_HOST`). Update it if you redeploy the
-server under a different name.
+- The client builds its WebSocket URL in [src/config.js](src/config.js)
+  (`SERVER_HOST`, path `/parties/main/<room>`). Update it if the Worker is
+  redeployed under a different name or domain.
+- [party/wrangler.jsonc](party/wrangler.jsonc) declares the `Main` Durable
+  Object. Wrangler never writes migrations for you: if you add, rename or
+  remove a Durable Object class, add a new `migrations` entry, then run
+  `npm run types` in `party/` to regenerate `worker-configuration.d.ts`.

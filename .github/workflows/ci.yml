@@ -27,3 +27,8 @@ jobs:
       - name: Typecheck server
         working-directory: party
         run: npx tsc --noEmit
+
+      # Bundles the Worker exactly as a deploy would, without credentials.
+      - name: Build server
+        working-directory: party
+        run: npx wrangler deploy --dry-run --outdir dist

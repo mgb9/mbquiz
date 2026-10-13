@@ -1,0 +1,20 @@
+// Cloudflare Worker config for the quiz server (PartyServer on Durable Objects).
+// Deploy with `npx wrangler deploy`; run locally with `npx wrangler dev`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wmg-quiz",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // One Durable Object per quiz room. The binding name `Main` is what
+  // routePartykitRequest() exposes as /parties/main/<room>.
+  "durable_objects": {
+    "bindings": [{ "name": "Main", "class_name": "Main" }]
+  },
+
+  // Wrangler never writes these for you: add a new entry whenever a Durable
+  // Object class is added, renamed or removed. SQLite storage is required on
+  // the Workers free plan.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Main"] }]
+}

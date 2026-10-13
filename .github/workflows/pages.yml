@@ -50,7 +50,7 @@ jobs:
         uses: actions/configure-pages@v4
 
       # No build step — upload the repo root directly,
-      # excluding the PartyKit server directory and node_modules.
+      # excluding the server directory and node_modules.
       - name: Upload Pages artefact
         uses: actions/upload-pages-artifact@v3
         with:
