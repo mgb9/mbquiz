@@ -49,6 +49,7 @@ git push origin main
 npm test
 
 # Local dev: server on :8787, client on :4321 (pages on localhost talk to :8787)
+# serve.json turns off serve's clean-URL redirect, which would drop ?room= from join links
 cd party && npx wrangler dev
 npx serve -p 4321 .
 ```
