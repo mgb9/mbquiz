@@ -10,7 +10,7 @@
     {
       "name": "wmg-quiz-server",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "party", "run", "dev", "--", "--port", "8787"],
+      "runtimeArgs": ["--prefix", "party", "run", "dev"],
       "port": 8787
     }
   ]

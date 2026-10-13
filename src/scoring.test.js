@@ -1,8 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calcScore, calcFlatScore, scoreAnswer } from "./scoring.js";
+import { calcScore, calcFlatScore, elapsedMs, scoreAnswer } from "./scoring.js";
 
 const LIMIT = 30; // seconds
+
+test("elapsedMs: time since the timer started, clamped at 0", () => {
+  assert.equal(elapsedMs(5_200, 1_000), 4_200);
+  assert.equal(elapsedMs(500, 1_000), 0);
+});
 
 test("calcScore: instant answer = 1000", () => {
   assert.equal(calcScore(1000, 1000, LIMIT), 1000);

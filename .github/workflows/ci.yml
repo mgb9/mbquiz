@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
+    branches-ignore: [main] # main runs this via the Pages workflow, before deploying
   pull_request:
+  workflow_call:
 
 jobs:
   test:
@@ -15,6 +17,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: party/package-lock.json
 
       # Root tests use only Node built-ins + local files — no install needed.
       - name: Run tests
@@ -31,4 +35,4 @@ jobs:
       # Bundles the Worker exactly as a deploy would, without credentials.
       - name: Build server
         working-directory: party
-        run: npx wrangler deploy --dry-run --outdir dist
+        run: npx wrangler deploy --dry-run

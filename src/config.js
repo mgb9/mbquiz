@@ -1,9 +1,8 @@
-// Quiz server: a Cloudflare Worker + Durable Object (PartyServer), deployed with
-// `cd party && npx wrangler deploy`. Pages served from localhost talk to
-// `wrangler dev` instead, so local testing never touches the live server.
-const LOCAL = typeof location !== "undefined" && ["localhost", "127.0.0.1"].includes(location.hostname);
-const SERVER_HOST = LOCAL ? "localhost:8787" : "wmg-quiz.mark-b12.workers.dev";
+// Quiz server (Cloudflare Worker + Durable Object, see DEPLOY.md). The live
+// site is always https; any http:// page is a local copy, so it talks to
+// `wrangler dev` on the same host and never touches the live server.
+const LOCAL = location.protocol === "http:";
+const SERVER = LOCAL ? `ws://${location.hostname}:8787` : "wss://wmg-quiz.mark-b12.workers.dev";
 
 // WebSocket URL for a room. PartyServer routes /parties/<binding>/<room>.
-export const roomSocketUrl = (room) =>
-  `${LOCAL ? "ws" : "wss"}://${SERVER_HOST}/parties/main/${encodeURIComponent(room)}`;
+export const roomSocketUrl = (room) => `${SERVER}/parties/main/${encodeURIComponent(room)}`;

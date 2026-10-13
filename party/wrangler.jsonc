@@ -1,11 +1,13 @@
 // Cloudflare Worker config for the quiz server (PartyServer on Durable Objects).
-// Deploy with `npx wrangler deploy`; run locally with `npx wrangler dev`.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "wmg-quiz",
   "main": "worker.ts",
   "compatibility_date": "2026-10-13",
-  "compatibility_flags": ["nodejs_compat"],
+
+  // `wrangler dev` listens on the LAN too, so phones can test against a local
+  // server (src/config.js points http:// pages at <same host>:8787).
+  "dev": { "ip": "0.0.0.0", "port": 8787 },
 
   // Workers Logs: requests, console output and uncaught errors are kept and
   // searchable under Workers & Pages → wmg-quiz → Logs in the dashboard.

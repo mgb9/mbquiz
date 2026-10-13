@@ -1,4 +1,16 @@
 /**
+ * Milliseconds from the timer starting to the answer arriving, never negative.
+ * Shared by scoring and the "answered in Xs" shown to players, so they agree.
+ *
+ * @param {number} answeredAt     - server timestamp (ms) when the answer arrived
+ * @param {number} questionStart  - server timestamp (ms) when the timer started
+ * @returns {number} elapsed ms
+ */
+export function elapsedMs(answeredAt, questionStart) {
+  return Math.max(0, answeredAt - questionStart);
+}
+
+/**
  * Calculate points for a correct answer.
  *
  * Kahoot-style speed scoring:
@@ -12,7 +24,7 @@
  * @returns {number} pts (0 if wrong; caller is responsible for checking correct)
  */
 export function calcScore(answeredAt, questionStart, timeLimitSecs) {
-  const elapsed  = Math.max(0, answeredAt - questionStart);          // ms elapsed
+  const elapsed  = elapsedMs(answeredAt, questionStart);             // ms elapsed
   const timeLimit = timeLimitSecs * 1000;                           // convert to ms
   const fraction  = Math.min(1, elapsed / timeLimit);               // 0.0 → 1.0
   return Math.round(1000 * (1 - fraction / 2));                     // 1000 → 500

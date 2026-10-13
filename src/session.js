@@ -7,9 +7,11 @@
  * load() returns null and save()/clear() silently no-op.
  */
 
-const FOUR_HOURS = 4 * 60 * 60 * 1000;
+// Also how long the server keeps an idle room's game (party/worker.ts), so a
+// saved session never outlives the game it would rejoin.
+export const SESSION_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 
-export function createSessionStore(storageKey, maxAgeMs = FOUR_HOURS) {
+export function createSessionStore(storageKey, maxAgeMs = SESSION_MAX_AGE_MS) {
   return {
     /** Entry for `room` if present and fresh, else null. */
     load(room) {

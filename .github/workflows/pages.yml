@@ -15,24 +15,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Gate the deploy on tests + typecheck so a red main never ships.
+  # Gate the deploy on the full CI job so a red main never ships.
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Run tests
-        run: npm test
-      - name: Install server deps
-        working-directory: party
-        run: npm ci
-      - name: Typecheck server
-        working-directory: party
-        run: npx tsc --noEmit
+    uses: ./.github/workflows/ci.yml
 
   deploy:
     needs: test

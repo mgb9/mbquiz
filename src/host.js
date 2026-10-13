@@ -41,8 +41,7 @@ let ws = null;
 
 function connect(room) {
   if (ws) ws.close();
-  const url = roomSocketUrl(room);
-  ws = new WebSocket(url);
+  ws = new WebSocket(roomSocketUrl(room));
   const thisWs = ws; // capture so the close handler knows if it's been superseded
 
   ws.addEventListener('open', () => {

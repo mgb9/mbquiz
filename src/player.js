@@ -44,8 +44,7 @@ function connect() {
   if (reconnectTimeout) { clearTimeout(reconnectTimeout); reconnectTimeout = null; }
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-  const url = roomSocketUrl(S.room);
-  ws = new WebSocket(url);
+  ws = new WebSocket(roomSocketUrl(S.room));
 
   ws.addEventListener('open', () => {
     hideReconnectBanner();

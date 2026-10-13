@@ -1,10 +1,8 @@
 import { Server, routePartykitRequest, type Connection, type WSMessage } from "partyserver";
+import { SESSION_MAX_AGE_MS } from "../src/session.js";
 import QuizServer from "./server";
 
-// A room with no messages for this long is treated as abandoned and its saved
-// game is deleted. Matches the clients' 4-hour session expiry.
-const IDLE_CLEANUP_MS = 4 * 60 * 60 * 1000;
-// Re-arming the alarm is a storage write, so do it at most this often.
+// Re-arming the cleanup alarm is a storage write, so do it at most this often.
 const ALARM_REFRESH_MS = 10 * 60 * 1000;
 
 // Durable Object hosting one quiz room. A thin adapter: all game logic lives in
@@ -23,24 +21,24 @@ export class Main extends Server<Env> {
   onConnect(conn: Connection)                 { this.quiz.onConnect(conn); }
   onClose(conn: Connection)                   { this.quiz.onClose(conn); }
   onMessage(conn: Connection, msg: WSMessage) {
-    if (typeof msg === "string") this.quiz.onMessage(msg, conn);
+    this.quiz.onMessage(msg, conn);
     this.refreshCleanupAlarm();
   }
 
-  // Games abandoned before "end" would otherwise keep their `state` key forever.
-  // Only that key is removed; in-memory state (if anyone is still connected) is
-  // untouched and is simply re-persisted on the next message.
+  // A room silent for as long as a player session lasts is abandoned: wipe its
+  // storage (game snapshot and PartyServer's own records). Anyone still
+  // connected keeps their in-memory game, which re-persists on the next message.
   async onAlarm() {
-    await this.ctx.storage.delete("state");
+    await this.ctx.storage.deleteAll();
   }
 
   // Push the cleanup alarm back. The extra ALARM_REFRESH_MS covers the throttle,
-  // so the alarm never fires sooner than IDLE_CLEANUP_MS after the last message.
+  // so the alarm never fires sooner than SESSION_MAX_AGE_MS after the last message.
   refreshCleanupAlarm() {
     const now = Date.now();
     if (now - this.alarmRefreshedAt < ALARM_REFRESH_MS) return;
     this.alarmRefreshedAt = now;
-    void this.ctx.storage.setAlarm(now + IDLE_CLEANUP_MS + ALARM_REFRESH_MS);
+    void this.ctx.storage.setAlarm(now + SESSION_MAX_AGE_MS + ALARM_REFRESH_MS);
   }
 }
 

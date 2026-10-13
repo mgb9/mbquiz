@@ -1,4 +1,4 @@
-import { scoreAnswer } from "../src/scoring.js";
+import { elapsedMs, scoreAnswer } from "../src/scoring.js";
 import { validateQuestions } from "../src/validation.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ export default class QuizServer {
 
   // ── Message routing ──────────────────────────────────────────────────────
 
-  onMessage(raw: string, sender: Conn) {
+  onMessage(raw: unknown, sender: Conn) {
     if (typeof raw !== "string" || raw.length > MAX_MSG_BYTES) return;
 
     let msg: ClientMessage;
@@ -467,7 +467,7 @@ export default class QuizServer {
     for (const [name, answer] of this.answers) {
       counts[answer.answerIndex]++;
       chosen[name] = answer.answerIndex;
-      answerTimes[name] = Math.max(0, answer.answeredAt - this.questionStartTime);
+      answerTimes[name] = elapsedMs(answer.answeredAt, this.questionStartTime);
       roundScores[name] = scoreAnswer({
         correct:       answer.answerIndex === q.correct,
         flat:          this.flatScoring,

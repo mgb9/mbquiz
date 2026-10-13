@@ -48,8 +48,10 @@ git push origin main
 # Run the test suite before deploying
 npm test
 
-# Local dev: server on :8787, client on :4321 (pages on localhost talk to :8787)
-# serve.json turns off serve's clean-URL redirect, which would drop ?room= from join links
+# Local dev: server on :8787, client on :4321. Any http:// page talks to the
+# local server on the same host, so phones on your Wi-Fi can use
+# http://<your-mac's-IP>:4321 too. serve.json turns off serve's clean-URL
+# redirect, which would drop ?room= from join links.
 cd party && npx wrangler dev
 npx serve -p 4321 .
 ```
@@ -57,9 +59,9 @@ npx serve -p 4321 .
 ## Configuration
 
 - The client builds its WebSocket URL in [src/config.js](src/config.js)
-  (`SERVER_HOST`, path `/parties/main/<room>`). Update it if the Worker is
+  (`SERVER`, path `/parties/main/<room>`). Update it if the Worker is
   redeployed under a different name or domain.
 - [party/wrangler.jsonc](party/wrangler.jsonc) declares the `Main` Durable
-  Object. Wrangler never writes migrations for you: if you add, rename or
-  remove a Durable Object class, add a new `migrations` entry, then run
-  `npm run types` in `party/` to regenerate `worker-configuration.d.ts`.
+  Object. If you add, rename or remove a Durable Object class, add a new
+  `migrations` entry there, then run `npm run types` in `party/` to regenerate
+  `worker-configuration.d.ts`.

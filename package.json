@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "test": "node --experimental-strip-types --test",
-    "deploy:server": "cd party && npx wrangler deploy"
+    "deploy:server": "npm --prefix party run deploy"
   }
 }
