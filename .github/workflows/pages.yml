@@ -49,14 +49,20 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v4
 
-      # No build step — upload the repo root directly,
-      # excluding the server directory and node_modules.
+      # No build step — publish only what the browser loads. Server code, tests,
+      # tooling and docs stay out of the public site.
+      - name: Assemble site
+        run: |
+          mkdir -p _site/src
+          cp index.html play.html _site/
+          cp -r questions _site/
+          cp src/*.js _site/src/
+          rm _site/src/*.test.js
+
       - name: Upload Pages artefact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
-          # Exclude server-side code that doesn't belong on the CDN
-          # (the upload action uses tar; we exclude via .gitattributes pattern)
+          path: _site
 
       - name: Deploy to GitHub Pages
         id:   deployment
