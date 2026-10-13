@@ -7,6 +7,10 @@
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat"],
 
+  // Workers Logs: requests, console output and uncaught errors are kept and
+  // searchable under Workers & Pages → wmg-quiz → Logs in the dashboard.
+  "observability": { "enabled": true },
+
   // One Durable Object per quiz room. The binding name `Main` is what
   // routePartykitRequest() exposes as /parties/main/<room>.
   "durable_objects": {
