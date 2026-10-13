@@ -427,20 +427,22 @@ export default class QuizServer {
   // ── Score calculation ─────────────────────────────────────────────────────
 
   calculateScores() {
-    const q            = this.questions[this.currentQ];
-    const timeLimitSecs = q.time ?? this.defaultTime;
-
     for (const [name, answer] of this.answers) {
       const player = this.players.get(name);
-      if (!player) continue;
-      player.score += scoreAnswer({
-        correct:       answer.answerIndex === q.correct,
-        flat:          this.flatScoring,
-        answeredAt:    answer.answeredAt,
-        questionStart: this.questionStartTime,
-        timeLimitSecs,
-      });
+      if (player) player.score += this.pointsFor(answer);
     }
+  }
+
+  /** Points an answer earns on the current question. */
+  private pointsFor(answer: Answer) {
+    const q = this.questions[this.currentQ];
+    return scoreAnswer({
+      correct:       answer.answerIndex === q.correct,
+      flat:          this.flatScoring,
+      answeredAt:    answer.answeredAt,
+      questionStart: this.questionStartTime,
+      timeLimitSecs: q.time ?? this.defaultTime,
+    });
   }
 
   // ── Broadcasts ────────────────────────────────────────────────────────────
@@ -455,41 +457,43 @@ export default class QuizServer {
     }));
   }
 
-  /** Reveal payload for the current question — shared by broadcast and rejoin. */
+  /**
+   * Reveal payload for the current question — shared by broadcast and rejoin.
+   * Public data only: each player's own answer goes to them in roundResult().
+   */
   private buildRevealData() {
-    const q            = this.questions[this.currentQ];
-    const timeLimitSecs = q.time ?? this.defaultTime;
-    const counts       = Array(q.answers.length).fill(0);
-    const roundScores: Record<string, number> = {};
-    const chosen:      Record<string, number> = {};
-    const answerTimes: Record<string, number> = {}; // nickname → ms from timer start to answer
-
-    for (const [name, answer] of this.answers) {
-      counts[answer.answerIndex]++;
-      chosen[name] = answer.answerIndex;
-      answerTimes[name] = elapsedMs(answer.answeredAt, this.questionStartTime);
-      roundScores[name] = scoreAnswer({
-        correct:       answer.answerIndex === q.correct,
-        flat:          this.flatScoring,
-        answeredAt:    answer.answeredAt,
-        questionStart: this.questionStartTime,
-        timeLimitSecs,
-      });
-    }
+    const q      = this.questions[this.currentQ];
+    const counts = Array(q.answers.length).fill(0);
+    for (const answer of this.answers.values()) counts[answer.answerIndex]++;
 
     return {
       type:        "reveal" as const,
+      index:       this.currentQ,
+      total:       this.questions.length,
       correct:     q.correct,
       counts,
       question:    { q: q.q, answers: q.answers, image: q.image },
-      roundScores,
-      chosen,
-      answerTimes,
       leaderboard: this.getLeaderboard(),
     };
   }
 
+  /** One player's own result for the current question, sent only to them. */
+  private roundResult(nickname: string) {
+    const answer = this.answers.get(nickname);
+    return {
+      type:   "round_result" as const,
+      choice: answer ? answer.answerIndex : null,
+      points: answer ? this.pointsFor(answer) : 0,
+      ms:     answer ? elapsedMs(answer.answeredAt, this.questionStartTime) : null,
+    };
+  }
+
   broadcastReveal() {
+    // Each player's own result first (a socket delivers in order, so it lands
+    // before the reveal), then the shared reveal, serialised once for everyone.
+    for (const [connId, nickname] of this.conns) {
+      this.room.getConnection(connId)?.send(JSON.stringify(this.roundResult(nickname)));
+    }
     this.room.broadcast(JSON.stringify(this.buildRevealData()));
   }
 
@@ -566,7 +570,8 @@ export default class QuizServer {
       }
 
     } else if (this.phase === "reveal") {
-      // Re-send the reveal so the player sees results
+      // Same pair as broadcastReveal, so a reload shows the player's own result
+      conn.send(JSON.stringify(this.roundResult(nickname)));
       conn.send(JSON.stringify(this.buildRevealData()));
 
     } else if (this.phase === "leaderboard") {

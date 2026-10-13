@@ -51,6 +51,9 @@ function setup() {
 
 const types = (arr) => arr.map((m) => m.type + (m.reason ? `:${m.reason}` : ""));
 
+// The private per-player result sent to `conn` just before the reveal.
+const roundResult = (conn) => conn.inbox.find((m) => m.type === "round_result");
+
 // ── Host authorization ───────────────────────────────────────────────────────
 
 test("first start with a token claims the room; phase advances to question", () => {
@@ -159,26 +162,26 @@ test("a correct answer awards points reflected in reveal + leaderboard", () => {
 
   const reveal = room.broadcasts.find((m) => m.type === "reveal");
   assert.ok(reveal, "expected a reveal broadcast");
-  assert.ok(reveal.roundScores.Alice > 0, "correct answer should score > 0");
+  assert.ok(roundResult(player).points > 0, "correct answer should score > 0");
   const top = reveal.leaderboard.find((p) => p.name === "Alice");
   assert.ok(top && top.score > 0);
 });
 
 test("a wrong answer scores zero", () => {
-  const { server, host, player, room } = setup();
+  const { server, host, player } = setup();
   send(server, player, { type: "join", nickname: "Bob", token: "p2" });
   send(server, host, { type: "start", hostToken: "HT", questions: QUIZ });
   send(server, host, { type: "begin_timer", hostToken: "HT" });
   send(server, player, { type: "answer", answerIndex: 3 }); // wrong
   send(server, host, { type: "next", hostToken: "HT" });
 
-  const reveal = room.broadcasts.find((m) => m.type === "reveal");
-  assert.equal(reveal.roundScores.Bob, 0);
+  assert.equal(roundResult(player).choice, 3);
+  assert.equal(roundResult(player).points, 0);
 });
 
-test("reveal reports each player's answer time, not time-to-reveal", (t) => {
+test("round_result reports the player's answer time, not time-to-reveal", (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
-  const { server, host, player, room } = setup();
+  const { server, host, player } = setup();
   send(server, player, { type: "join", nickname: "Alice", token: "p1" });
   send(server, host, { type: "start", hostToken: "HT", questions: QUIZ });
   send(server, host, { type: "begin_timer", hostToken: "HT" });
@@ -187,8 +190,48 @@ test("reveal reports each player's answer time, not time-to-reveal", (t) => {
   t.mock.timers.tick(20_000); // host waits before revealing
   send(server, host, { type: "next", hostToken: "HT" });
 
+  assert.equal(roundResult(player).ms, 4_200);
+});
+
+test("each player gets only their own result; the broadcast reveal has no answers in it", () => {
+  const { server, host, player, room } = setup();
+  const bob = mockConn("bob");
+  send(server, player, { type: "join", nickname: "Alice", token: "p1" });
+  send(server, bob, { type: "join", nickname: "Bob", token: "p2" });
+  send(server, host, { type: "start", hostToken: "HT", questions: QUIZ });
+  send(server, host, { type: "begin_timer", hostToken: "HT" });
+  send(server, player, { type: "answer", answerIndex: 0 }); // right
+  send(server, bob, { type: "answer", answerIndex: 2 });    // wrong
+  send(server, host, { type: "next", hostToken: "HT" });
+
+  assert.equal(roundResult(player).choice, 0);
+  assert.equal(roundResult(bob).choice, 2);
+  assert.equal(host.inbox.find((m) => m.type === "round_result"), undefined, "host isn't a player");
+
   const reveal = room.broadcasts.find((m) => m.type === "reveal");
-  assert.equal(reveal.answerTimes.Alice, 4_200);
+  assert.deepEqual(reveal.counts, [1, 0, 1, 0]);
+  for (const key of ["roundScores", "chosen", "answerTimes"]) {
+    assert.equal(reveal[key], undefined, `${key} must not be broadcast to everyone`);
+  }
+});
+
+test("rejoining during the reveal re-sends the player's own result and the question", () => {
+  const { server, host, player } = setup();
+  send(server, player, { type: "join", nickname: "Alice", token: "p1" });
+  send(server, host, { type: "start", hostToken: "HT", questions: QUIZ });
+  send(server, host, { type: "begin_timer", hostToken: "HT" });
+  send(server, player, { type: "answer", answerIndex: 0 }); // correct
+  send(server, host, { type: "next", hostToken: "HT" });    // reveal
+
+  const reloaded = mockConn("alice-reloaded");
+  send(server, reloaded, { type: "rejoin", nickname: "Alice", token: "p1" });
+  assert.deepEqual(types(reloaded.inbox), ["rejoined", "round_result", "reveal"]);
+  const [, result, reveal] = reloaded.inbox;
+  assert.equal(result.choice, 0);
+  assert.equal(result.points, roundResult(player).points);
+  assert.equal(reveal.index, 0);
+  assert.equal(reveal.total, QUIZ.length);
+  assert.deepEqual(reveal.question.answers, QUIZ[0].answers);
 });
 
 // ── Rejoin + persistence (durability) ────────────────────────────────────────

@@ -23,7 +23,7 @@ const S = {
   currentQ:      null,     // { q, answers, time }
   qIndex:        0,
   qTotal:        0,
-  answerTime:    null,     // ms from timer start to our answer (server-measured), set on reveal
+  answerTime:    null,     // ms from timer start to our answer (server-measured), from round_result
   chosenAnswer:  null,
   roundScore:    0,
   rankPos:       0,
@@ -246,14 +246,25 @@ function onMessage(msg) {
       }
       break;
 
+    case 'round_result':
+      // Our own result for this question; the server sends it just before the
+      // reveal (also on rejoin), so a reload mid-reveal shows the right result.
+      S.chosenAnswer = msg.choice;
+      S.roundScore   = msg.points;
+      S.answerTime   = msg.ms;
+      break;
+
     case 'reveal': {
       stopTimer();
-      S.correct = msg.correct;
+      // Older servers put every player's result in the reveal instead.
+      if (msg.roundScores) {
+        S.roundScore = msg.roundScores[S.nickname] || 0;
+        S.answerTime = msg.answerTimes?.[S.nickname] ?? null;
+      }
+      if (msg.index != null) { S.qIndex = msg.index + 1; S.qTotal = msg.total; }
+      S.currentQ    = msg.question;
+      S.correct     = msg.correct;
       S.leaderboard = msg.leaderboard || [];
-      const wasCorrect = S.chosenAnswer === msg.correct;
-      S.roundScore = (msg.roundScores && msg.roundScores[S.nickname]) || 0;
-      S.answerTime = msg.answerTimes?.[S.nickname] ?? null;
-      if (wasCorrect) S.score += S.roundScore;
 
       // Rank change
       const prevRank = findRank(S.preLB, S.nickname);

@@ -29,7 +29,7 @@ const S = {
   qTotal:        0,
   currentQ:      null,     // { q, answers, time }
   questionStart: 0,
-  revealData:    null,     // { correct, counts, question, roundScores, leaderboard }
+  revealData:    null,     // { index, total, correct, counts, question, leaderboard }
   leaderboard:      [],
   playerAnswers:    {},   // name → { qIndex: chosenAnswerIndex }
   questionCorrects: [],   // correct answer index per question (populated on game_over)
